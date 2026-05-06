@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Conversor Drive</title>
+
+<style>
+body {
+    margin: 0;
+    background: #0d0d0d;
+    color: white;
+    font-family: Arial;
+}
+
+/* CONTAINER PRINCIPAL */
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* COLUNAS */
+.coluna {
+    flex: 1;
+    padding: 20px;
+}
+
+/* SEPARADOR */
+.coluna:first-child {
+    border-right: 1px solid #333;
+}
+
+/* CAMPOS */
+input, textarea {
+    width: 100%;
+    padding: 8px;
+    margin: 5px 0;
+    border-radius: 4px;
+    border: none;
+    font-size: 14px;
+}
+
+/* TEXTAREA */
+textarea {
+    height: 50px;
+    resize: none;
+}
+
+/* BOTÕES */
+button {
+    padding: 8px 15px;
+    margin-top: 5px;
+    background: #1db954;
+    border: none;
+    color: white;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+button:hover {
+    background: #17a74a;
+}
+
+.copy {
+    background: #007bff;
+}
+
+.copy:hover {
+    background: #0056b3;
+}
+
+/* TITULOS */
+h2 {
+    margin-top: 0;
+}
+
+/* STATUS */
+.status {
+    color: #1db954;
+    font-size: 12px;
+    margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- 🔹 COLUNA ESQUERDA (ENTRADA) -->
+    <div class="coluna">
+        <h2>🔗 Entrada</h2>
+
+        <label>Link do Google Drive:</label>
+        <input type="text" id="link" placeholder="Cole aqui o link">
+
+        <button onclick="converter()">Converter</button>
+    </div>
+
+
+    <!-- 🔹 COLUNA DIREITA (RESULTADO) -->
+    <div class="coluna">
+        <h2>📤 Resultado</h2>
+
+        <label>ID:</label>
+        <textarea id="id" readonly></textarea>
+
+        <label>Link Preview:</label>
+        <textarea id="preview" readonly></textarea>
+        <button class="copy" onclick="copiar('preview')">Copiar Link</button>
+
+        <label>Código HTML:</label>
+        <textarea id="codigo" readonly></textarea>
+        <button class="copy" onclick="copiar('codigo')">Copiar Código</button>
+
+        <p class="status" id="status"></p>
+    </div>
+
+</div>
+
+<script>
+function converter() {
+    let link = document.getElementById("link").value;
+
+    try {
+        let id = link.split("/d/")[1].split("/")[0];
+        let preview = "https://drive.google.com/file/d/" + id + "/preview";
+        let codigo = `<iframe src="${preview}" width="800" height="450"></iframe>`;
+
+        document.getElementById("id").value = id;
+        document.getElementById("preview").value = preview;
+        document.getElementById("codigo").value = codigo;
+
+        document.getElementById("status").innerText = "Convertido!";
+    } catch {
+        alert("Link inválido");
+    }
+}
+
+function copiar(campo) {
+    let texto = document.getElementById(campo);
+    texto.select();
+    document.execCommand("copy");
+    document.getElementById("status").innerText = "Copiado!";
+}
+</script>
+
+</body>
+</html>
