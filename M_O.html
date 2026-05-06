@@ -19,7 +19,7 @@
       align-items: center;
       min-height: 100vh;
       margin: 0;
-      padding: 50px 20px; /* Aumentado para 50px em cima e embaixo (~3cm) */
+      padding: 50px 20px;
     }
 
     body:fullscreen {
@@ -380,8 +380,9 @@
 
   <script>
     // ==================== CONFIGURAÇÕES MQTT ====================
+    // IMPORTANTE: Usando WSS (WebSocket Seguro) para funcionar no GitHub Pages (HTTPS)
     const MQTT_CONFIG = {
-        broker: 'ws://broker.emqx.io:8083/mqtt',
+        broker: 'wss://broker.emqx.io:8084/mqtt',  // Porta 8084 para WSS (seguro)
         topics: {
             micro: 'wellguard/v10/relay/micro',
             status: 'wellguard/v10/status',
