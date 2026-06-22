@@ -1,1178 +1,550 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Micro-ondas - Brastemp</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <style>
-    * { 
-      box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>THERMO PRO MONITOR V2.6</title>
+<style>
+:root {
+    --bg-main: #0b0f19;
+    --bg-panel: #131a26;
+    --bg-input: #1c2635;
+    --text-primary: #f3f4f6;
+    --text-secondary: #9ca3af;
+    --accent-blue: #3b82f6;
+    --accent-green: #10b981;
+    --accent-orange: #f59e0b;
+    --accent-red: #ef4444;
+    --accent-purple: #8b5cf6;
+    --accent-gray: #4b5563;
+}
 
-    body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      padding: 50px 20px;
-    }
+*{
+    box-sizing: border-box;
+    transition: background-color 0.2s, border-color 0.2s;
+}
 
-    body:fullscreen {
-      background: #1c1c1c;
-      padding: 0;
-    }
-    
-    body:fullscreen .remote {
-      max-width: 100%;
-      width: 100%;
-      height: 100vh;
-      border-radius: 0;
-      padding: 5vh 4vw;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    
-    body:fullscreen .screen {
-      height: 25vh;
-      font-size: 12vw;
-    }
-    
-    body:fullscreen .btn-time {
-      padding: 2vh 3vw;
-      font-size: 4vw;
-    }
-    
-    body:fullscreen .btn-nav {
-      width: 18vw;
-      height: 10vh;
-      font-size: 8vw;
-    }
-    
-    body:fullscreen .pause-btn,
-    body:fullscreen .start-btn {
-      width: 20vw;
-      height: 12vh;
-      font-size: 8vw;
-    }
-    
-    body:fullscreen .smart-food {
-      font-size: 5vw;
-      padding: 2vh;
-    }
+html, body{
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
 
-    .remote {
-      width: 100%;
-      max-width: min(90vw, 450px);
-      background: #1c1c1c;
-      border-radius: clamp(20px, 8vw, 50px);
-      padding: clamp(20px, 6vw, 40px) clamp(10px, 4vw, 20px);
-      box-shadow: 0 15px 40px rgba(0,0,0,0.8);
-      border: 7px solid #111;
-      transition: all 0.3s ease;
-      margin: 0 auto;
-    }
+body{
+    display: flex; 
+    flex-direction: column;
+}
 
-    .header {
-      text-align: center;
-      margin-bottom: clamp(15px, 4vh, 25px);
-    }
+header{
+    background: var(--bg-panel);
+    padding: 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    z-index: 10;
+}
 
-    .brand {
-      color: #00ffcc;
-      font-size: clamp(24px, 7vw, 38px);
-      font-weight: bold;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
+h1{
+    margin: 0; 
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    background: linear-gradient(45deg, #3b82f6, #ef4444);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
 
-    .brand small {
-      font-size: clamp(11px, 3vw, 15px);
-      letter-spacing: 1px;
-      display: block;
-      color: #ff6600;
-      margin-top: 6px;
-    }
+.controles{
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+}
 
-    .status-bar {
-      background: #0a0a0a;
-      border-radius: clamp(10px, 2.5vw, 15px);
-      padding: clamp(8px, 2vh, 12px);
-      margin: clamp(8px, 2.5vh, 15px) clamp(8px, 3vw, 15px);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: monospace;
-    }
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.02);
+    padding: 4px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
 
-    .mqtt-status {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: clamp(11px, 3vw, 13px);
-      color: #aaa;
-    }
+button{
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    color: #fff;
+}
 
-    .mqtt-led {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background-color: #ff3333;
-      box-shadow: 0 0 5px #ff3333;
-      transition: all 0.3s ease;
-    }
+button:active { transform: scale(0.97); }
 
-    .mqtt-led.connected {
-      background-color: #00ff00;
-      box-shadow: 0 0 8px #00ff00;
-    }
-    
-    .mqtt-led.disconnected {
-      background-color: #ff3333;
-      box-shadow: 0 0 5px #ff3333;
-      animation: pulse 1s infinite;
-    }
-    
-    @keyframes pulse {
-      0% { opacity: 1; }
-      50% { opacity: 0.3; }
-      100% { opacity: 1; }
-    }
+#btnConectar{ background: var(--accent-green); }
+#btnConectar:hover{ background: #059669; }
+#btnCalibrar{ background: var(--accent-blue); }
+#btnCalibrar:hover{ background: #2563eb; }
+#btnPico{ background: var(--accent-orange); }
+#btnPico:hover{ background: #d97706; }
+#btnZerarConsole{ background: var(--accent-gray); }
+#btnZerarConsole:hover{ background: #374151; }
+#btnFullscreen{ background: #1f2937; border: 1px solid rgba(255,255,255,0.1); }
+#btnFullscreen:hover{ background: #374151; }
 
-    .wifi-signal {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: clamp(11px, 3vw, 13px);
-      color: #00ffcc;
-    }
+input[type="number"]{
+    width: 70px;
+    text-align: center;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 5px;
+    background: var(--bg-input);
+    color: #fff;
+    font-weight: bold;
+}
+input[type="number"]:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
 
-    .wifi-icon {
-      font-size: clamp(16px, 4vw, 20px);
-    }
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
 
-    .signal-bars {
-      display: flex;
-      gap: 2px;
-      align-items: flex-end;
-      margin-left: 5px;
-    }
+#status{
+    font-size: 12px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--accent-red);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+}
+#status.conectado {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
 
-    .bar {
-      width: 3px;
-      background-color: #00ffcc;
-      transition: all 0.3s ease;
-    }
+.main{
+    height: calc(100vh - 65px); 
+    display: grid;
+    grid-template-columns: 50% 50%;
+    gap: 10px;
+    padding: 10px;
+    overflow: hidden;
+}
 
-    .bar.bar1 { height: 6px; }
-    .bar.bar2 { height: 10px; }
-    .bar.bar3 { height: 14px; }
-    .bar.bar4 { height: 18px; }
+#painel-foto {
+    background: var(--bg-panel);
+    border-radius: 12px;
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(255, 255, 255, 0.03);
+}
 
-    .bar.weak { background-color: #ffaa00; }
-    .bar.medium { background-color: #ffff00; }
-    .bar.strong { background-color: #00ff00; }
+#painel-foto img {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain; /* Garantiu que a foto inteira caiba na moldura */
+}
 
-    .screen {
-      background: #0a0a0a;
-      height: clamp(110px, 28vh, 180px);
-      border-radius: clamp(14px, 3.5vw, 22px);
-      margin: clamp(15px, 4vh, 25px) clamp(8px, 3vw, 15px);
-      border: 4px solid #333;
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: clamp(48px, 13vw, 80px);
-      font-weight: bold;
-      color: #00ffcc;
-      letter-spacing: 4px;
-      transition: all 0.1s ease;
-      overflow: hidden;
-    }
+.coluna-graficos {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    height: 100%;
+    overflow: hidden;
+}
 
-    .screen .door-message {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.95);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: clamp(16px, 4.5vw, 24px);
-      font-weight: bold;
-      color: #ffaa00;
-      text-align: center;
-      letter-spacing: 1px;
-      animation: pulseMessage 1s infinite;
-      backdrop-filter: blur(2px);
-      z-index: 10;
-    }
-    
-    .screen .door-message span {
-      font-size: clamp(34px, 11vw, 55px);
-      margin-bottom: 10px;
-    }
-    
-    @keyframes pulseMessage {
-      0% { opacity: 1; background: rgba(0, 0, 0, 0.95); }
-      50% { opacity: 0.9; background: rgba(0, 0, 0, 0.9); }
-      100% { opacity: 1; background: rgba(0, 0, 0, 0.95); }
-    }
+.painel{
+    background: var(--bg-panel);
+    border-radius: 12px;
+    padding: 6px 12px;
+    flex: 1; 
+    min-height: 0; 
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+}
 
-    .screen::after {
-      content: "ATIVE!";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      color: #00ffcc;
-      font-size: clamp(18px, 5.5vw, 32px);
-      opacity: 0.08;
-      pointer-events: none;
-      font-weight: bold;
-      letter-spacing: 2px;
-    }
+.panel-header-inline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+}
 
-    .screen.flash {
-      animation: flashText 0.3s ease-in-out 3;
-    }
+.panel-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
 
-    @keyframes flashText {
-      0% { opacity: 1; text-shadow: 0 0 0 #00ffcc; }
-      50% { opacity: 0.7; text-shadow: 0 0 15px #00ffcc; color: #fff; }
-      100% { opacity: 1; text-shadow: 0 0 0 #00ffcc; }
-    }
+.panel-value {
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+}
 
-    .colon {
-      animation: blink 1s step-start infinite;
-      display: inline-block;
-    }
+.canvas-container {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 0; 
+}
 
-    @keyframes blink {
-      50% { opacity: 0; }
-    }
+canvas{
+    width: 100%;
+    height: 100%;
+    display: block;
+}
 
-    .buttons { padding: clamp(8px, 2.5vh, 15px) clamp(5px, 2vw, 10px); }
-
-    .smart-food {
-      background: linear-gradient(135deg, #6b00ff, #c300ff);
-      color: white;
-      text-align: center;
-      padding: clamp(12px, 3.5vh, 20px);
-      border-radius: clamp(28px, 7vw, 45px);
-      font-size: clamp(16px, 5vw, 22px);
-      font-weight: bold;
-      margin: clamp(12px, 3.5vh, 22px) 0 clamp(15px, 4.5vh, 28px) 0;
-      cursor: pointer;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    
-    .smart-food:active {
-      transform: scale(0.98);
-    }
-
-    .time-buttons {
-      display: flex;
-      justify-content: center;
-      gap: clamp(10px, 3.5vw, 18px);
-      margin-bottom: clamp(18px, 5vh, 30px);
-    }
-
-    .btn-time {
-      background: #ff3333;
-      color: white;
-      padding: clamp(12px, 3vh, 18px) clamp(14px, 4.5vw, 26px);
-      border-radius: 50px;
-      font-weight: bold;
-      font-size: clamp(14px, 4.5vw, 20px);
-      border: none;
-      cursor: pointer;
-      transition: transform 0.1s;
-      white-space: nowrap;
-    }
-    .btn-time:active { transform: scale(0.96); }
-    .btn-time.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
-
-    .nav-buttons {
-      display: flex;
-      justify-content: center;
-      gap: clamp(35px, 12vw, 70px);
-      margin: clamp(15px, 4vh, 25px) 0 clamp(18px, 5vh, 30px) 0;
-    }
-
-    .btn-nav {
-      background: #333;
-      color: white;
-      width: clamp(65px, 20vw, 100px);
-      height: clamp(50px, 12vh, 70px);
-      border-radius: clamp(28px, 7vw, 45px);
-      font-size: clamp(32px, 9vw, 50px);
-      font-weight: bold;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .btn-nav:active { background: #555; }
-    .btn-nav.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
-
-    .bottom-controls {
-      display: flex;
-      justify-content: center;
-      gap: clamp(30px, 10vw, 55px);
-      margin-top: clamp(10px, 3vh, 20px);
-    }
-
-    .pause-btn {
-      background: #e0e0e0;
-      color: #1c1c1c;
-      width: clamp(75px, 22vw, 110px);
-      height: clamp(55px, 13vh, 80px);
-      border-radius: clamp(28px, 7vw, 45px);
-      font-size: clamp(24px, 7vw, 38px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .pause-btn:active { background: #ccc; }
-    .pause-btn.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      pointer-events: none;
-    }
-
-    .start-btn {
-      background: #e74c3c;
-      color: white;
-      width: clamp(75px, 22vw, 110px);
-      height: clamp(55px, 13vh, 80px);
-      border-radius: clamp(28px, 7vw, 45px);
-      font-size: clamp(32px, 8vw, 45px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border: none;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .start-btn:active { background: #c0392b; }
-    .start-btn.disabled {
-      background: #666;
-      cursor: not-allowed;
-      opacity: 0.5;
-      pointer-events: none;
-    }
-
-    .bottom-labels {
-      display: flex;
-      justify-content: center;
-      gap: clamp(30px, 10vw, 55px);
-      margin-top: clamp(8px, 2vh, 15px);
-    }
-
-    .label {
-      font-size: clamp(10px, 2.8vw, 13px);
-      color: #aaaaaa;
-      text-align: center;
-      width: clamp(75px, 22vw, 110px);
-    }
-    
-    .offline-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0,0,0,0.95);
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      backdrop-filter: blur(10px);
-    }
-    
-    .offline-message {
-      text-align: center;
-      color: #ff6600;
-      font-size: clamp(20px, 6vw, 32px);
-      padding: 30px;
-      background: #1a1a1a;
-      border-radius: 20px;
-      border: 2px solid #ff6600;
-    }
-    
-    .offline-message span {
-      font-size: 50px;
-      display: block;
-      margin-bottom: 20px;
-    }
-  </style>
+@media(max-width:900px){
+    .main { grid-template-columns: 1fr; grid-template-rows: 35% 65%; height: auto; overflow: auto; }
+    .coluna-graficos { height: 500px; }
+}
+</style>
 </head>
 <body>
 
-  <div class="remote">
-    <div class="header">
-      <div class="brand">
-        MICRO-ONDAS
-        <small>i9iOT Systema Yasmin</small>
-      </div>
-    </div>
-
-    <div class="status-bar">
-      <div class="mqtt-status">
-        <div id="mqttLed" class="mqtt-led disconnected"></div>
-        <span id="mqttText">Desconectado</span>
-      </div>
-      <div class="wifi-signal">
-        <span class="wifi-icon"></span>
-        <span id="signalText">-- dBm</span>
-        <div class="signal-bars" id="signalBars">
-          <div class="bar bar1"></div>
-          <div class="bar bar2"></div>
-          <div class="bar bar3"></div>
-          <div class="bar bar4"></div>
+<header>
+    <h1>THERMO PRO MONITOR</h1>
+    <div class="controles">
+        <button id="btnConectar" onclick="conectarArduino()">🔌 Conectar</button>
+        <button id="btnCalibrar" onclick="calibrarZero()">🎯 Calibrar Offset</button>
+        <button id="btnPico" onclick="zerarPico()">🗑️ Zerar Picos</button>
+        <button id="btnZerarConsole" onclick="zerarGraficos()">🧹 Limpar Gráficos</button>
+        <button id="btnFullscreen" onclick="toggleFullscreen()">📺 Tela Cheia</button>
+        
+        <div class="control-group">
+            <span>Atenção (°C):</span>
+            <input id="limiteAtencao" type="number" value="40" onchange="salvarLimites()">
         </div>
-      </div>
-    </div>
-    
-    <div id="display" class="screen">
-      <div id="doorMessage" class="door-message" style="display: none;">
-        <span>🚪</span>
-        PORTA ABERTA!
-      </div>
-      00:00
-    </div>
-
-    <div class="buttons">
-      <div id="smartFoodBtn" class="smart-food">smart food</div>
-
-      <div class="time-buttons">
-        <button class="btn-time" data-time="300">+5 min</button>
-        <button class="btn-time" data-time="60">+1 min</button>
-        <button class="btn-time" data-time="30">+30 seg</button>
-      </div>
-
-      <div class="nav-buttons">
-        <button id="minusBtn" class="btn-nav">−</button>
-        <button id="plusBtn" class="btn-nav">+</button>
-      </div>
-
-      <div class="bottom-controls">
-        <button id="pauseBtn" class="pause-btn">⏸</button>
-        <button id="startBtn" class="start-btn">▶</button>
-      </div>
-
-      <div class="bottom-labels">
-        <div class="label">pausar / cancelar</div>
-        <div class="label">iniciar</div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // ==================== CONFIGURAÇÕES MQTT ====================
-    const MQTT_CONFIG = {
-        broker: 'wss://broker.emqx.io:8084/mqtt',
-        topics: {
-            micro: 'wellguard/v10/relay/micro',
-            status: 'wellguard/v10/status',
-            door: 'wellguard/v10/door',
-            signal: 'wellguard/v10/signal',
-            heartbeat: 'wellguard/v10/heartbeat'
-        },
-        deviceID: 'web_controle_' + Math.random().toString(36).substr(2, 6)
-    };
-
-    let mqttClient = null;
-    let lastHeartbeat = Date.now();
-    let heartbeatInterval = null;
-    let isESPOnline = false;
-
-    // ==================== ESTADO ====================
-    let timeLeft = 0;           
-    let timerInterval = null;   
-    let isPaused = false;       
-    let isActive = true;
-    let clockInterval = null;
-    let beepInterval = null;
-    let isDoorOpen = false;
-    let doorPaused = false;
-    
-    // ==================== CONTROLE DE EXIBIÇÃO ====================
-    let tempMessageTimeout = null;
-    let isTempMessageShowing = false;
-    let pauseMessageActive = false;
-    
-    // ==================== ELEMENTOS ====================
-    const display = document.getElementById('display');
-    const doorMessage = document.getElementById('doorMessage');
-    const startBtn = document.getElementById('startBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
-    const smartFoodBtn = document.getElementById('smartFoodBtn');
-    const mqttLed = document.getElementById('mqttLed');
-    const mqttText = document.getElementById('mqttText');
-    const signalText = document.getElementById('signalText');
-    const signalBars = document.getElementById('signalBars');
-
-    // ==================== FUNÇÕES DE STATUS ====================
-    function updateMQTTStatus(connected) {
-      isESPOnline = connected;
-      if (connected) {
-        mqttLed.classList.remove('disconnected');
-        mqttLed.classList.add('connected');
-        mqttText.textContent = 'Micro-ondas Conectado ✓';
-        mqttText.style.color = '#00ff00';
-      } else {
-        mqttLed.classList.remove('connected');
-        mqttLed.classList.add('disconnected');
-        mqttText.textContent = 'ESP32 Offline ✗';
-        mqttText.style.color = '#ff3333';
+        <div class="control-group">
+            <span>Perigo (°C):</span>
+            <input id="limitePerigo" type="number" value="70" onchange="salvarLimites()">
+        </div>
         
-        // Reseta sinal quando offline
-        signalText.textContent = '-- dBm';
-        const bars = document.querySelectorAll('.bar');
-        bars.forEach(bar => {
-          bar.style.opacity = '0.2';
+        <label class="checkbox-label"><input type="checkbox" id="alarme" checked onchange="gerenciarSirenePorCheckbox()"> 🔔 Alarme</label>
+        <span id="status">OFFLINE</span>
+    </div>
+</header>
+
+<div class="main">
+    <div id="painel-foto">
+        <img src="file:///C:/Users/bbnetto/Desktop/Projetos/Desalinizador/foto.png" alt="Foto do Desalinizador" onerror="this.style.display='none'; this.parentNode.innerHTML='⚠️ Erro de Segurança do Navegador.<br><br>Seu navegador bloqueou o acesso direto ao C:\\.<br>Para resolver: salve esta foto como <b>foto.png</b> na MESMA pasta onde está este arquivo HTML e mude o src para <b>src=&quot;foto.png&quot;</b>';">
+    </div>
+
+    <div class="coluna-graficos">
+        <div class="painel">
+            <div class="panel-header-inline">
+                <div class="panel-title">Sensor 1</div>
+                <div id="valTxt1" class="panel-value">0°C</div>
+            </div>
+            <div class="canvas-container"><canvas id="grafico1"></canvas></div>
+        </div>
+        <div class="painel">
+            <div class="panel-header-inline">
+                <div class="panel-title">Sensor 2</div>
+                <div id="valTxt2" class="panel-value">0°C</div>
+            </div>
+            <div class="canvas-container"><canvas id="grafico2"></canvas></div>
+        </div>
+        <div class="painel">
+            <div class="panel-header-inline">
+                <div class="panel-title">Sensor 3</div>
+                <div id="valTxt3" class="panel-value">0°C</div>
+            </div>
+            <div class="canvas-container"><canvas id="grafico3"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<script>
+let porta, leitor;
+let historicos = [[], [], []];
+let picos = [0, 0, 0];
+let ultimosValores = [0, 0, 0];
+let offsetCalibracao = 0;
+let ultimoValorBrutoRef = 0; 
+
+const TEMP_MIN = 0;
+const TEMP_MAX = 100;
+
+let audioCtx = null;
+let osciladorSirene = null;
+let ganhoSirene = null;
+let intervaloSirene = null;
+let tomSireneAlta = true;
+let sireneTocando = false;
+
+const canvasIds = ["grafico1", "grafico2", "grafico3"];
+
+function zerarGraficos() {
+    historicos = [[], [], []];
+    desenharTodosOsGraficos();
+}
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.error(`Erro Fullscreen: ${err.message}`);
         });
-      }
+    } else {
+        document.exitFullscreen();
     }
+}
+
+function calibrarZero() {
+    offsetCalibracao = ultimoValorBrutoRef; 
+    localStorage.setItem("thermo_offset", offsetCalibracao);
+}
+
+function salvarLimites() {
+    let atencao = document.getElementById("limiteAtencao").value;
+    let perigo = document.getElementById("limitePerigo").value;
+    localStorage.setItem("thermo_limiteAtencao", atencao);
+    localStorage.setItem("thermo_limitePerigo", perigo);
+}
+
+function zerarPico() {
+    picos = [...ultimosValores];
+}
+
+function ligarSirene() {
+    if (!document.getElementById("alarme").checked) return;
+    if (sireneTocando) return;
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        osciladorSirene = audioCtx.createOscillator();
+        ganhoSirene = audioCtx.createGain();
+        osciladorSirene.type = "triangle"; 
+        osciladorSirene.frequency.setValueAtTime(750, audioCtx.currentTime); 
+        ganhoSirene.gain.setValueAtTime(0.25, audioCtx.currentTime);
+        osciladorSirene.connect(ganhoSirene);
+        ganhoSirene.connect(audioCtx.destination);
+        osciladorSirene.start();
+        sireneTocando = true;
+        intervaloSirene = setInterval(() => {
+            if (!sireneTocando || !audioCtx) return;
+            osciladorSirene.frequency.linearRampToValueAtTime(tomSireneAlta ? 750 : 550, audioCtx.currentTime + 0.1);
+            tomSireneAlta = !tomSireneAlta;
+        }, 600);
+    } catch(e) { console.error(e); }
+}
+
+function desligarSirene() {
+    if (intervaloSirene) { clearInterval(intervaloSirene); intervaloSirene = null; }
+    if (osciladorSirene) { try { osciladorSirene.stop(); osciladorSirene.disconnect(); } catch(e){} osciladorSirene = null; }
+    if (ganhoSirene) { try { ganhoSirene.disconnect(); } catch(e){} ganhoSirene = null; }
+    sireneTocando = false;
+}
+
+function gerenciarSirenePorCheckbox() {
+    if (!document.getElementById("alarme").checked) desligarSirene();
+}
+
+function desenharGraficoIndividual(id, index) {
+    const el = document.getElementById(id);
+    if (!el) return;
     
-    function updateSignalStrength(rssi, percent) {
-      if (!isESPOnline) return;
-      
-      signalText.textContent = `${rssi} dBm`;
-      
-      const bars = document.querySelectorAll('.bar');
-      bars.forEach(bar => {
-        bar.classList.remove('weak', 'medium', 'strong');
-      });
-      
-      if (percent < 30) {
-        bars.forEach(bar => bar.classList.add('weak'));
-      } else if (percent < 70) {
-        bars.forEach(bar => bar.classList.add('medium'));
-      } else {
-        bars.forEach(bar => bar.classList.add('strong'));
-      }
-      
-      const barCount = Math.ceil(percent / 25);
-      for (let i = 0; i < bars.length; i++) {
-        if (i < barCount) {
-          bars[i].style.opacity = '1';
-        } else {
-          bars[i].style.opacity = '0.2';
+    el.width = el.clientWidth;
+    el.height = el.clientHeight;
+    const ctx = el.getContext("2d");
+    const w = el.width;
+    const h = el.height;
+
+    const margemEsquerda = 45; 
+    const margemDireita = 15;  
+    const margemBase = 18;
+    const margemTopo = 8;
+    const largGrafico = w - margemEsquerda - margemDireita;
+    const altGrafico = h - margemTopo - margemBase;
+
+    ctx.fillStyle = "#090d16";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(margemEsquerda, margemTopo, largGrafico, altGrafico);
+
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.04)";
+    ctx.lineWidth = 1;
+
+    let qteDivisoesX = 8; 
+    for (let i = 0; i <= qteDivisoesX; i++) {
+        let x = margemEsquerda + i * (largGrafico / qteDivisoesX);
+        ctx.beginPath(); ctx.moveTo(x, margemTopo); ctx.lineTo(x, h - margemBase); ctx.stroke();
+    }
+
+    let qteDivisoesY = 3; 
+    ctx.fillStyle = "rgba(156, 163, 175, 0.8)";
+    ctx.font = "9px monospace";
+    ctx.textAlign = "right"; 
+    ctx.textBaseline = "middle";
+
+    for (let i = 0; i <= qteDivisoesY; i++) {
+        let y = margemTopo + i * (altGrafico / qteDivisoesY);
+        ctx.beginPath(); ctx.moveTo(margemEsquerda, y); ctx.lineTo(w - margemDireita, y); ctx.stroke();
+        let valorTempY = Math.round(TEMP_MAX - (i * ((TEMP_MAX - TEMP_MIN) / qteDivisoesY)));
+        ctx.fillText(valorTempY + "°C", margemEsquerda - 5, y);
+    }
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    for (let i = 0; i <= qteDivisoesX; i++) {
+        let x = margemEsquerda + i * (largGrafico / qteDivisoesX);
+        let tempoRelativo = Math.round(-20 + (i * (20 / qteDivisoesX)));
+        ctx.fillText(tempoRelativo === 0 ? "Agora" : tempoRelativo + "s", x, h - margemBase + 3);
+    }
+
+    let hist = historicos[index];
+    if (hist.length > 1) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(margemEsquerda, margemTopo, largGrafico, altGrafico);
+        ctx.clip();
+
+        let limiteAtencao = parseInt(document.getElementById("limiteAtencao").value) || 40;
+        let limitePerigo = parseInt(document.getElementById("limitePerigo").value) || 70;
+        let corLinha = "#3b82f6"; 
+        
+        let valorAtual = ultimosValores[index];
+        if (valorAtual >= limitePerigo) corLinha = "#ef4444";
+        else if (valorAtual >= limiteAtencao) corLinha = "#f59e0b";
+
+        ctx.strokeStyle = corLinha;
+        ctx.lineWidth = 1.8;
+        ctx.shadowBlur = 4;
+        ctx.shadowColor = corLinha;
+
+        ctx.beginPath();
+        for (let i = 0; i < hist.length; i++) {
+            let x = margemEsquerda + (i / 300) * largGrafico;
+            let y = (h - margemBase) - ((hist[i] - TEMP_MIN) / (TEMP_MAX - TEMP_MIN)) * altGrafico;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
-      }
+        ctx.stroke();
+        ctx.restore();
+    }
+}
+
+function desenharTodosOsGraficos() {
+    canvasIds.forEach((id, index) => desenharGraficoIndividual(id, index));
+}
+
+function atualizar(valoresReais) {
+    if(!Array.isArray(valoresReais)){
+        valoresReais = [valoresReais, valoresReais * 0.9, valoresReais * 1.1]; 
     }
     
-    // Monitora heartbeat do ESP32
-    function startHeartbeatMonitor() {
-      if (heartbeatInterval) clearInterval(heartbeatInterval);
-      
-      heartbeatInterval = setInterval(() => {
-        const now = Date.now();
-        if (now - lastHeartbeat > 15000) { // 15 segundos sem heartbeat
-          if (isESPOnline) {
-            console.log('⚠️ ESP32 offline detectado!');
-            updateMQTTStatus(false);
-            // Desabilita botões
-            startBtn.classList.add('disabled');
-            document.querySelectorAll('.btn-time').forEach(btn => btn.classList.add('disabled'));
-            document.getElementById('plusBtn').classList.add('disabled');
-            document.getElementById('minusBtn').classList.add('disabled');
-          }
-        } else {
-          if (!isESPOnline) {
-            console.log('✅ ESP32 online detectado!');
-            updateMQTTStatus(true);
-            // Reabilita botões se porta estiver fechada
-            if (!isDoorOpen) {
-              startBtn.classList.remove('disabled');
-              document.querySelectorAll('.btn-time').forEach(btn => btn.classList.remove('disabled'));
-              document.getElementById('plusBtn').classList.remove('disabled');
-              document.getElementById('minusBtn').classList.remove('disabled');
+    ultimoValorBrutoRef = valoresReais[0];
+    let dispararAlarme = false;
+    let limitePerigo = parseInt(document.getElementById("limitePerigo").value) || 70;
+
+    for(let i = 0; i < 3; i++) {
+        let valorBruto = valoresReais[i] !== undefined ? valoresReais[i] : 0;
+        let valorCalibrado = i === 0 ? (valorBruto - offsetCalibracao) : valorBruto;
+        
+        ultimosValores[i] = valorCalibrado;
+
+        if (historicos[i].length === 0 || valorCalibrado > picos[i]) {
+            picos[i] = valorCalibrado;
+        }
+
+        historicos[i].push(valorCalibrado);
+        if (historicos[i].length > 300) historicos[i].shift();
+        
+        let elTxt = document.getElementById("valTxt" + (i + 1));
+        if (elTxt) elTxt.innerHTML = Math.round(valorCalibrado) + "°C";
+        
+        if (valorCalibrado >= limitePerigo) dispararAlarme = true;
+    }
+
+    if (dispararAlarme) ligarSirene(); else desligarSirene();
+
+    desenharTodosOsGraficos();
+}
+
+async function conectarArduino() {
+    try {
+        porta = await navigator.serial.requestPort();
+        await porta.open({ baudRate: 115200 });
+        let st = document.getElementById("status");
+        st.innerHTML = "ONLINE";
+        st.className = "conectado";
+
+        const decoder = new TextDecoderStream();
+        porta.readable.pipeTo(decoder.writable);
+        leitor = decoder.readable.getReader();
+
+        let buffer = "";
+        while (true) {
+            const { value, done } = await leitor.read();
+            if (done) break;
+            buffer += value;
+            let linhas = buffer.split("\n");
+            buffer = linhas.pop();
+            for (let linha of linhas) {
+                linha = linha.trim();
+                if(linha.length === 0) continue;
+                
+                let partes = linha.split(/[\s,]+/); // Linha corrigida e limpa aqui!
+                let leituras = partes.map(p => parseFloat(p)).filter(n => !isNaN(n));
+                
+                if (leituras.length > 0) {
+                    atualizar(leituras);
+                }
             }
-          }
         }
-      }, 5000);
+    } catch (e) {
+        let st = document.getElementById("status");
+        st.innerHTML = "ERRO"; st.className = "";
     }
-    
-    // ==================== FUNÇÕES MQTT ====================
-    function connectMQTT() {
-        try {
-            mqttClient = mqtt.connect(MQTT_CONFIG.broker);
-            
-            mqttClient.on('connect', () => {
-                console.log('✓ Conectado ao broker MQTT');
-                
-                mqttClient.subscribe(MQTT_CONFIG.topics.status);
-                mqttClient.subscribe(MQTT_CONFIG.topics.door);
-                mqttClient.subscribe(MQTT_CONFIG.topics.signal);
-                mqttClient.subscribe(MQTT_CONFIG.topics.heartbeat);
-            });
-            
-            mqttClient.on('message', (topic, message) => {
-                const msg = message.toString();
-                console.log(`Mensagem recebida [${topic}]: ${msg}`);
-                
-                if (topic === MQTT_CONFIG.topics.heartbeat) {
-                  lastHeartbeat = Date.now();
-                  if (!isESPOnline) {
-                    updateMQTTStatus(true);
-                    if (!isDoorOpen) {
-                      startBtn.classList.remove('disabled');
-                      document.querySelectorAll('.btn-time').forEach(btn => btn.classList.remove('disabled'));
-                      document.getElementById('plusBtn').classList.remove('disabled');
-                      document.getElementById('minusBtn').classList.remove('disabled');
-                    }
-                  }
-                  return;
-                }
-                
-                if (topic === MQTT_CONFIG.topics.door) {
-                    const wasOpen = isDoorOpen;
-                    isDoorOpen = (msg === "OPEN");
-                    
-                    if (!wasOpen && isDoorOpen) {
-                        if (timerInterval !== null && !isPaused && timeLeft > 0) {
-                            doorPaused = true;
-                            manualPause();
-                        }
-                        updateDoorMessage();
-                    } else if (wasOpen && !isDoorOpen) {
-                        if (doorPaused && timeLeft > 0) {
-                            doorPaused = false;
-                            manualResume();
-                        }
-                        updateDoorMessage();
-                    }
-                }
-                
-                if (topic === MQTT_CONFIG.topics.signal) {
-                    const [rssi, percent] = msg.split(',');
-                    updateSignalStrength(parseInt(rssi), parseInt(percent));
-                }
-            });
-            
-            mqttClient.on('error', (err) => {
-                console.error('Erro MQTT:', err);
-                updateMQTTStatus(false);
-            });
-            
-            mqttClient.on('offline', () => {
-                console.log('Cliente MQTT offline');
-                updateMQTTStatus(false);
-            });
-            
-        } catch(e) {
-            console.error('Erro ao conectar MQTT:', e);
-            updateMQTTStatus(false);
-        }
-    }
-    
-    function sendMQTTCommand(topic, command) {
-        if (mqttClient && mqttClient.connected && isESPOnline) {
-            mqttClient.publish(topic, command);
-            console.log(`📤 Comando enviado: ${topic} = ${command}`);
-        } else {
-            console.warn('ESP32 não está online!');
-            showTempMessage("ESP OFFLINE!", true);
-        }
-    }
-    
-    function controlMicro(state) {
-        const command = state ? 'ON' : 'OFF';
-        sendMQTTCommand(MQTT_CONFIG.topics.micro, command);
-    }
-    
-    function updateRelays() {
-        const isCountingActive = (timerInterval !== null && !isPaused && timeLeft > 0 && !isDoorOpen && isESPOnline);
-        
-        if (isCountingActive && isActive) {
-            controlMicro(true);
-        } else {
-            controlMicro(false);
-        }
-    }
-    
-    function updateDoorMessage() {
-        if (isDoorOpen) {
-            doorMessage.style.display = 'flex';
-            startBtn.classList.add('disabled');
-            document.querySelectorAll('.btn-time').forEach(btn => btn.classList.add('disabled'));
-            document.getElementById('plusBtn').classList.add('disabled');
-            document.getElementById('minusBtn').classList.add('disabled');
-        } else {
-            doorMessage.style.display = 'none';
-            if (isESPOnline) {
-              startBtn.classList.remove('disabled');
-              document.querySelectorAll('.btn-time').forEach(btn => btn.classList.remove('disabled'));
-              document.getElementById('plusBtn').classList.remove('disabled');
-              document.getElementById('minusBtn').classList.remove('disabled');
-            }
-        }
-    }
-    
-    function manualPause() {
-        if (timerInterval !== null && !isPaused) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            isPaused = true;
-            controlMicro(false);
-            showPauseMessagePermanent();
-        }
-    }
-    
-    function manualResume() {
-        if (isPaused && timeLeft > 0 && !isDoorOpen && isESPOnline) {
-            isPaused = false;
-            hidePauseMessage();
-            startTimer();
-        }
-    }
-    
-    function cancelAll() {
-        if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-        }
-        
-        isPaused = false;
-        doorPaused = false;
-        timeLeft = 0;
-        
-        controlMicro(false);
-        stopBeep();
-        hidePauseMessage();
-        startClock();
-        updateDisplay();
-    }
+}
 
-    // ==================== FUNÇÃO FULLSCREEN ====================
-    function toggleFullscreen() {
-      const doc = document.documentElement;
-      const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
-      
-      if (!isFullscreen) {
-        const requestFullscreen = doc.requestFullscreen || doc.webkitRequestFullscreen || doc.mozRequestFullScreen || doc.msRequestFullscreen;
-        if (requestFullscreen) {
-          requestFullscreen.call(doc);
-        }
-      } else {
-        const exitFullscreen = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
-        if (exitFullscreen) {
-          exitFullscreen.call(document);
-        }
-      }
-    }
+window.onload = () => {
+    let offset = localStorage.getItem("thermo_offset");
+    if (offset) offsetCalibracao = parseInt(offset);
 
-    // ==================== ÁUDIO ====================
-    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let limiteAtencaoSalvo = localStorage.getItem("thermo_limiteAtencao");
+    let limitePerigoSalvo = localStorage.getItem("thermo_limitePerigo");
+    if (limiteAtencaoSalvo) document.getElementById("limiteAtencao").value = limiteAtencaoSalvo;
+    if (limitePerigoSalvo) document.getElementById("limitePerigo").value = limitePerigoSalvo;
 
-    function playBeep() {
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-      const oscillator = audioContext.createOscillator();
-      const gain = audioContext.createGain();
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
-      gain.gain.setValueAtTime(0.3, audioContext.currentTime);
-      oscillator.connect(gain);
-      gain.connect(audioContext.destination);
-      oscillator.start();
-      setTimeout(() => oscillator.stop(), 150);
-    }
+    desenharTodosOsGraficos();
+};
 
-    function startBeep() {
-      if (beepInterval) clearInterval(beepInterval);
-      beepInterval = setInterval(playBeep, 600);
-    }
-
-    function stopBeep() {
-      if (beepInterval) {
-        clearInterval(beepInterval);
-        beepInterval = null;
-      }
-    }
-
-    // ==================== FORMATAÇÃO COM DOIS PONTOS ====================
-    function formatTime(seconds) {
-      const min = Math.floor(seconds / 60);
-      const sec = seconds % 60;
-      return `${min.toString().padStart(2, '0')}<span class="colon">:</span>${sec.toString().padStart(2, '0')}`;
-    }
-
-    function formatClock(hours, minutes) {
-      return `${hours.toString().padStart(2, '0')}<span class="colon">:</span>${minutes.toString().padStart(2, '0')}`;
-    }
-
-    function showClock() {
-      if (timeLeft > 0 || timerInterval || isTempMessageShowing || pauseMessageActive || isDoorOpen) return;
-      const now = new Date();
-      const h = now.getHours().toString().padStart(2, '0');
-      const m = now.getMinutes().toString().padStart(2, '0');
-      display.innerHTML = formatClock(h, m);
-    }
-
-    function startClock() {
-      if (clockInterval) clearInterval(clockInterval);
-      clockInterval = setInterval(showClock, 1000);
-      showClock();
-    }
-
-    function stopClock() {
-      if (clockInterval) clearInterval(clockInterval);
-      clockInterval = null;
-    }
-
-    // ==================== EXIBIÇÃO DO DISPLAY ====================
-    function restoreDisplay() {
-      if (isTempMessageShowing) return;
-      if (pauseMessageActive) return;
-      if (isDoorOpen) return;
-      if (timeLeft > 0) {
-        display.innerHTML = formatTime(timeLeft);
-      } else {
-        const now = new Date();
-        const h = now.getHours().toString().padStart(2, '0');
-        const m = now.getMinutes().toString().padStart(2, '0');
-        display.innerHTML = formatClock(h, m);
-      }
-    }
-
-    function showTempMessage(message, isFlashing = false) {
-      if (pauseMessageActive) return;
-      if (isDoorOpen) return;
-      
-      if (tempMessageTimeout) {
-        clearTimeout(tempMessageTimeout);
-      }
-      
-      isTempMessageShowing = true;
-      display.classList.remove('flash');
-      display.innerHTML = message;
-      display.style.fontSize = "clamp(32px, 9vw, 55px)";
-      
-      if (isFlashing) {
-        void display.offsetWidth;
-        display.classList.add('flash');
-        setTimeout(() => {
-          display.classList.remove('flash');
-        }, 900);
-      }
-      
-      tempMessageTimeout = setTimeout(() => {
-        isTempMessageShowing = false;
-        display.style.fontSize = "clamp(48px, 13vw, 80px)";
-        restoreDisplay();
-        tempMessageTimeout = null;
-      }, 1000);
-    }
-    
-    function showPauseMessagePermanent() {
-      if (tempMessageTimeout) {
-        clearTimeout(tempMessageTimeout);
-        tempMessageTimeout = null;
-      }
-      isTempMessageShowing = false;
-      pauseMessageActive = true;
-      display.classList.remove('flash');
-      display.innerHTML = "PAUSA";
-      display.style.fontSize = "clamp(36px, 10vw, 60px)";
-    }
-    
-    function hidePauseMessage() {
-      if (pauseMessageActive) {
-        pauseMessageActive = false;
-        display.style.fontSize = "clamp(48px, 13vw, 80px)";
-        restoreDisplay();
-      }
-    }
-
-    function updateDisplay() {
-      if (isTempMessageShowing) return;
-      if (pauseMessageActive) return;
-      if (isDoorOpen) return;
-      if (timeLeft > 0) {
-        display.innerHTML = formatTime(timeLeft);
-      } else {
-        showClock();
-      }
-    }
-
-    // ==================== TIMER PRINCIPAL ====================
-    function startTimer() {
-      if (timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-      }
-      
-      if (!isESPOnline) {
-        showTempMessage("ESP OFFLINE!", true);
-        return;
-      }
-      
-      if (timeLeft <= 0) {
-        showTempMessage("AJUSTE O TEMPO!", true);
-        return;
-      }
-      if (isDoorOpen) {
-        showTempMessage("PORTA ABERTA!", true);
-        return;
-      }
-      
-      stopClock();
-      stopBeep();
-      hidePauseMessage();
-      
-      timerInterval = setInterval(() => {
-        if (!isPaused && timeLeft > 0 && !isDoorOpen && isESPOnline) {
-          timeLeft--;
-          if (!isTempMessageShowing && !pauseMessageActive) {
-            display.innerHTML = formatTime(timeLeft);
-          }
-          
-          if (timeLeft === 0) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-            isPaused = false;
-            doorPaused = false;
-            startBeep();
-            startClock();
-            hidePauseMessage();
-            updateDisplay();
-            updateRelays();
-          } else {
-            updateRelays();
-          }
-        }
-      }, 1000);
-      
-      updateRelays();
-    }
-
-    function manualPauseOrCancel() {
-      if (beepInterval) {
-        stopBeep();
-        timeLeft = 0;
-        if (timerInterval) {
-          clearInterval(timerInterval);
-          timerInterval = null;
-        }
-        isPaused = false;
-        doorPaused = false;
-        hidePauseMessage();
-        startClock();
-        updateDisplay();
-        updateRelays();
-        return;
-      }
-      
-      if (timerInterval !== null || isPaused) {
-        if (!isPaused) {
-          clearInterval(timerInterval);
-          timerInterval = null;
-          isPaused = true;
-          showPauseMessagePermanent();
-          updateRelays();
-        } else {
-          clearInterval(timerInterval);
-          timerInterval = null;
-          timeLeft = 0;
-          isPaused = false;
-          doorPaused = false;
-          stopBeep();
-          hidePauseMessage();
-          startClock();
-          updateDisplay();
-          updateRelays();
-        }
-      } else {
-        if (timeLeft !== 0) {
-          timeLeft = 0;
-          updateDisplay();
-        }
-        stopBeep();
-        hidePauseMessage();
-        startClock();
-        updateRelays();
-      }
-    }
-
-    function activateTimerMode() {
-      stopClock();
-      stopBeep();
-    }
-
-    // ==================== EVENT LISTENERS ====================
-    
-    document.querySelectorAll('.btn-time').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!isESPOnline) {
-          showTempMessage("ESP OFFLINE!", true);
-          return;
-        }
-        if (isDoorOpen) {
-          showTempMessage("PORTA ABERTA!", true);
-          return;
-        }
-        const increment = parseInt(btn.dataset.time);
-        if (isNaN(increment)) return;
-        activateTimerMode();
-        timeLeft += increment;
-        if (!pauseMessageActive) {
-          updateDisplay();
-        }
-      });
-    });
-
-    document.getElementById('plusBtn').addEventListener('click', () => {
-      if (!isESPOnline) {
-        showTempMessage("ESP OFFLINE!", true);
-        return;
-      }
-      if (isDoorOpen) {
-        showTempMessage("PORTA ABERTA!", true);
-        return;
-      }
-      activateTimerMode();
-      timeLeft += 10;
-      if (!pauseMessageActive) {
-        updateDisplay();
-      }
-    });
-
-    document.getElementById('minusBtn').addEventListener('click', () => {
-      if (!isESPOnline) {
-        showTempMessage("ESP OFFLINE!", true);
-        return;
-      }
-      if (isDoorOpen) {
-        showTempMessage("PORTA ABERTA!", true);
-        return;
-      }
-      activateTimerMode();
-      if (timeLeft >= 10) timeLeft -= 10;
-      else if (timeLeft > 0 && timeLeft < 10) timeLeft = 0;
-      if (!pauseMessageActive) {
-        updateDisplay();
-      }
-      if (timeLeft === 0 && timerInterval) {
-        clearInterval(timerInterval);
-        timerInterval = null;
-        isPaused = false;
-        doorPaused = false;
-        stopBeep();
-        hidePauseMessage();
-        startClock();
-        updateDisplay();
-        updateRelays();
-      }
-    });
-
-    startBtn.addEventListener('click', () => {
-      if (!isESPOnline) {
-        showTempMessage("ESP OFFLINE!", true);
-        return;
-      }
-      if (isDoorOpen) {
-        showTempMessage("PORTA ABERTA!", true);
-        return;
-      }
-      if (timeLeft <= 0) {
-        showTempMessage("AJUSTE O TEMPO!", true);
-        return;
-      }
-      
-      if (timerInterval !== null && !isPaused) return;
-      
-      if ((timerInterval === null && isPaused) || (doorPaused && isPaused)) {
-        isPaused = false;
-        doorPaused = false;
-        hidePauseMessage();
-        startTimer();
-        return;
-      }
-      
-      if (timerInterval === null && !isPaused && timeLeft > 0) {
-        isPaused = false;
-        doorPaused = false;
-        hidePauseMessage();
-        startTimer();
-      }
-    });
-
-    pauseBtn.addEventListener('click', () => {
-      if (isDoorOpen) return;
-      manualPauseOrCancel();
-    });
-
-    // ==================== SMART FOOD - FULLSCREEN ====================
-    smartFoodBtn.addEventListener('click', () => {
-      toggleFullscreen();
-    });
-
-    // ==================== INICIALIZAÇÃO ====================
-    connectMQTT();
-    startHeartbeatMonitor();
-    startClock();
-    
-    const resumeAudioOnFirstClick = () => {
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-      document.removeEventListener('click', resumeAudioOnFirstClick);
-    };
-    document.addEventListener('click', resumeAudioOnFirstClick);
-    
-    function stopBeepOnAnyAction() {
-      if (beepInterval) {
-        stopBeep();
-        if (timeLeft === 0 && timerInterval === null) {
-          startClock();
-          hidePauseMessage();
-          updateDisplay();
-          updateRelays();
-        }
-      }
-    }
-    
-    const allInteractive = [startBtn, pauseBtn, smartFoodBtn, ...document.querySelectorAll('.btn-time'), document.getElementById('plusBtn'), document.getElementById('minusBtn')];
-    allInteractive.forEach(el => {
-      if (el) el.addEventListener('click', stopBeepOnAnyAction);
-    });
-
-    setInterval(() => {
-      if (mqttClient && !mqttClient.connected) {
-        console.log("Tentando reconectar MQTT...");
-        connectMQTT();
-      }
-    }, 30000);
-  </script>
+window.addEventListener("resize", desenharTodosOsGraficos);
+</script>
 </body>
 </html>
