@@ -1,550 +1,303 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>THERMO PRO MONITOR V2.6</title>
-<style>
-:root {
-    --bg-main: #0b0f19;
-    --bg-panel: #131a26;
-    --bg-input: #1c2635;
-    --text-primary: #f3f4f6;
-    --text-secondary: #9ca3af;
-    --accent-blue: #3b82f6;
-    --accent-green: #10b981;
-    --accent-orange: #f59e0b;
-    --accent-red: #ef4444;
-    --accent-purple: #8b5cf6;
-    --accent-gray: #4b5563;
-}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>EVA RADAR RF - Dashboard MQTT</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --shadow: 0 10px 25px -5px rgba(0,0,0,0.4);
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+    body {
+      min-height: 100vh;
+      background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 80%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    header {
+      background: var(--card);
+      padding: 12px 16px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    h1 { font-size: 1.1rem; color: var(--accent); font-weight: 700; }
+    
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      background: #0f172a;
+      padding: 6px 12px;
+      border-radius: 20px;
+    }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #334155; }
+    .dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
-*{
-    box-sizing: border-box;
-    transition: background-color 0.2s, border-color 0.2s;
-}
+    .grid-main {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 768px) {
+      .grid-main { grid-template-columns: 300px 1fr; }
+    }
 
-html, body{
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-    background: var(--bg-main);
-    color: var(--text-primary);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-}
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .card h2 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
 
-body{
-    display: flex; 
-    flex-direction: column;
-}
+    .leds {
+      display: flex;
+      justify-content: space-around;
+      background: #0f172a;
+      padding: 10px;
+      border-radius: 12px;
+      margin-bottom: 12px;
+    }
+    .led-box { text-align: center; font-size: 0.65rem; color: var(--muted); }
+    .led {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #334155;
+      margin: 0 auto 4px;
+      transition: all 0.3s;
+    }
+    .led.green.active { background: var(--green); box-shadow: 0 0 12px var(--green); }
+    .led.yellow.active { background: var(--yellow); box-shadow: 0 0 12px var(--yellow); }
+    .led.red.active { background: var(--red); box-shadow: 0 0 12px var(--red); }
 
-header{
-    background: var(--bg-panel);
-    padding: 12px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    z-index: 10;
-}
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      font-size: 0.85rem;
+    }
+    .metric span:last-child { font-weight: 700; color: var(--accent); }
 
-h1{
-    margin: 0; 
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    background: linear-gradient(45deg, #3b82f6, #ef4444);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .form-group label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 2px; }
+    .form-group input {
+      width: 100%;
+      padding: 6px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.8rem;
+    }
+    
+    .btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 0.8rem;
+    }
+    .btn:active { opacity: 0.8; }
 
-.controles{
-    display: flex;
-    justify-content: center;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-}
+    .chart-card { min-height: 320px; display: flex; flex-direction: column; }
+    .chart-box { flex: 1; position: relative; width: 100%; height: 100%; }
 
-.control-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    background: rgba(255,255,255,0.02);
-    padding: 4px 10px;
-    border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.05);
-}
-
-button{
-    padding: 8px 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    color: #fff;
-}
-
-button:active { transform: scale(0.97); }
-
-#btnConectar{ background: var(--accent-green); }
-#btnConectar:hover{ background: #059669; }
-#btnCalibrar{ background: var(--accent-blue); }
-#btnCalibrar:hover{ background: #2563eb; }
-#btnPico{ background: var(--accent-orange); }
-#btnPico:hover{ background: #d97706; }
-#btnZerarConsole{ background: var(--accent-gray); }
-#btnZerarConsole:hover{ background: #374151; }
-#btnFullscreen{ background: #1f2937; border: 1px solid rgba(255,255,255,0.1); }
-#btnFullscreen:hover{ background: #374151; }
-
-input[type="number"]{
-    width: 70px;
-    text-align: center;
-    border-radius: 6px;
-    border: 1px solid rgba(255,255,255,0.1);
-    padding: 5px;
-    background: var(--bg-input);
-    color: #fff;
-    font-weight: bold;
-}
-input[type="number"]:focus {
-    outline: none;
-    border-color: var(--accent-blue);
-}
-
-.checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    font-weight: 600;
-}
-
-#status{
-    font-size: 12px;
-    font-weight: bold;
-    padding: 4px 10px;
-    border-radius: 20px;
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--accent-red);
-    border: 1px solid rgba(239, 68, 68, 0.2);
-}
-#status.conectado {
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--accent-green);
-    border: 1px solid rgba(16, 185, 129, 0.2);
-}
-
-.main{
-    height: calc(100vh - 65px); 
-    display: grid;
-    grid-template-columns: 50% 50%;
-    gap: 10px;
-    padding: 10px;
-    overflow: hidden;
-}
-
-#painel-foto {
-    background: var(--bg-panel);
-    border-radius: 12px;
-    height: 100%;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(255, 255, 255, 0.03);
-}
-
-#painel-foto img {
-    width: 100%;
-    height: 100%;
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain; /* Garantiu que a foto inteira caiba na moldura */
-}
-
-.coluna-graficos {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 8px;
-    height: 100%;
-    overflow: hidden;
-}
-
-.painel{
-    background: var(--bg-panel);
-    border-radius: 12px;
-    padding: 6px 12px;
-    flex: 1; 
-    min-height: 0; 
-    border: 1px solid rgba(255, 255, 255, 0.03);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-    display: flex;
-    flex-direction: column;
-}
-
-.panel-header-inline {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 2px;
-}
-
-.panel-title {
-    font-size: 10px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.panel-value {
-    font-family: monospace;
-    font-size: 14px;
-    font-weight: 700;
-    color: #fff;
-}
-
-.canvas-container {
-    flex: 1;
-    position: relative;
-    width: 100%;
-    height: 100%;
-    min-height: 0; 
-}
-
-canvas{
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-@media(max-width:900px){
-    .main { grid-template-columns: 1fr; grid-template-rows: 35% 65%; height: auto; overflow: auto; }
-    .coluna-graficos { height: 500px; }
-}
-</style>
+    footer {
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+  </style>
 </head>
 <body>
 
-<header>
-    <h1>THERMO PRO MONITOR</h1>
-    <div class="controles">
-        <button id="btnConectar" onclick="conectarArduino()">🔌 Conectar</button>
-        <button id="btnCalibrar" onclick="calibrarZero()">🎯 Calibrar Offset</button>
-        <button id="btnPico" onclick="zerarPico()">🗑️ Zerar Picos</button>
-        <button id="btnZerarConsole" onclick="zerarGraficos()">🧹 Limpar Gráficos</button>
-        <button id="btnFullscreen" onclick="toggleFullscreen()">📺 Tela Cheia</button>
-        
-        <div class="control-group">
-            <span>Atenção (°C):</span>
-            <input id="limiteAtencao" type="number" value="40" onchange="salvarLimites()">
-        </div>
-        <div class="control-group">
-            <span>Perigo (°C):</span>
-            <input id="limitePerigo" type="number" value="70" onchange="salvarLimites()">
-        </div>
-        
-        <label class="checkbox-label"><input type="checkbox" id="alarme" checked onchange="gerenciarSirenePorCheckbox()"> 🔔 Alarme</label>
-        <span id="status">OFFLINE</span>
-    </div>
-</header>
+  <div class="container">
+    <header>
+      <h1>EVA RADAR RF</h1>
+      <div class="status-badge">
+        <div id="dotWeb" class="dot"></div>
+        <span id="txtWeb">Conectando...</span>
+      </div>
+    </header>
 
-<div class="main">
-    <div id="painel-foto">
-        <img src="file:///C:/Users/bbnetto/Desktop/Projetos/Desalinizador/foto.png" alt="Foto do Desalinizador" onerror="this.style.display='none'; this.parentNode.innerHTML='⚠️ Erro de Segurança do Navegador.<br><br>Seu navegador bloqueou o acesso direto ao C:\\.<br>Para resolver: salve esta foto como <b>foto.png</b> na MESMA pasta onde está este arquivo HTML e mude o src para <b>src=&quot;foto.png&quot;</b>';">
-    </div>
+    <div class="grid-main">
+      <!-- Lateral de Indicadores -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="card">
+          <h2>Status do Sistema</h2>
+          <div class="leds">
+            <div class="led-box"><div id="ledVerde" class="led green"></div>AUSENTE</div>
+            <div class="led-box"><div id="ledAmarelo" class="led yellow"></div>SUSPEITA</div>
+            <div class="led-box"><div id="ledVermelho" class="led red"></div>PRESENÇA</div>
+          </div>
 
-    <div class="coluna-graficos">
-        <div class="painel">
-            <div class="panel-header-inline">
-                <div class="panel-title">Sensor 1</div>
-                <div id="valTxt1" class="panel-value">0°C</div>
+          <div class="metric"><span>RSSI Atual:</span><span id="valRssi">0 dBm</span></div>
+          <div class="metric"><span>Referência:</span><span id="valRef">0 dBm</span></div>
+          <div class="metric"><span>Delta:</span><span id="valDelta">0 dB</span></div>
+          <div class="metric"><span>Estado:</span><span id="valEstado">OFFLINE</span></div>
+        </div>
+
+        <div class="card">
+          <h2>Ajustes Remotos</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Limiar Ent. (dBm):</label>
+              <input type="number" step="0.1" id="cfgEntrada" value="3.5">
             </div>
-            <div class="canvas-container"><canvas id="grafico1"></canvas></div>
-        </div>
-        <div class="painel">
-            <div class="panel-header-inline">
-                <div class="panel-title">Sensor 2</div>
-                <div id="valTxt2" class="panel-value">0°C</div>
+            <div class="form-group">
+              <label>Limiar Saída (dBm):</label>
+              <input type="number" step="0.1" id="cfgSaida" value="1.8">
             </div>
-            <div class="canvas-container"><canvas id="grafico2"></canvas></div>
+          </div>
+          <button class="btn" onclick="enviarConfiguracao()">Enviar Limiares via MQTT</button>
         </div>
-        <div class="painel">
-            <div class="panel-header-inline">
-                <div class="panel-title">Sensor 3</div>
-                <div id="valTxt3" class="panel-value">0°C</div>
-            </div>
-            <div class="canvas-container"><canvas id="grafico3"></canvas></div>
+      </div>
+
+      <!-- Gráfico Principal -->
+      <div class="card chart-card">
+        <h2>Sinal RF em Tempo Real</h2>
+        <div class="chart-box">
+          <canvas id="chartRssi"></canvas>
         </div>
+      </div>
     </div>
-</div>
 
-<script>
-let porta, leitor;
-let historicos = [[], [], []];
-let picos = [0, 0, 0];
-let ultimosValores = [0, 0, 0];
-let offsetCalibracao = 0;
-let ultimoValorBrutoRef = 0; 
+    <footer>broker.emqx.io • EVA RADAR RF System</footer>
+  </div>
 
-const TEMP_MIN = 0;
-const TEMP_MAX = 100;
-
-let audioCtx = null;
-let osciladorSirene = null;
-let ganhoSirene = null;
-let intervaloSirene = null;
-let tomSireneAlta = true;
-let sireneTocando = false;
-
-const canvasIds = ["grafico1", "grafico2", "grafico3"];
-
-function zerarGraficos() {
-    historicos = [[], [], []];
-    desenharTodosOsGraficos();
-}
-
-function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => {
-            console.error(`Erro Fullscreen: ${err.message}`);
-        });
-    } else {
-        document.exitFullscreen();
-    }
-}
-
-function calibrarZero() {
-    offsetCalibracao = ultimoValorBrutoRef; 
-    localStorage.setItem("thermo_offset", offsetCalibracao);
-}
-
-function salvarLimites() {
-    let atencao = document.getElementById("limiteAtencao").value;
-    let perigo = document.getElementById("limitePerigo").value;
-    localStorage.setItem("thermo_limiteAtencao", atencao);
-    localStorage.setItem("thermo_limitePerigo", perigo);
-}
-
-function zerarPico() {
-    picos = [...ultimosValores];
-}
-
-function ligarSirene() {
-    if (!document.getElementById("alarme").checked) return;
-    if (sireneTocando) return;
-    try {
-        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        osciladorSirene = audioCtx.createOscillator();
-        ganhoSirene = audioCtx.createGain();
-        osciladorSirene.type = "triangle"; 
-        osciladorSirene.frequency.setValueAtTime(750, audioCtx.currentTime); 
-        ganhoSirene.gain.setValueAtTime(0.25, audioCtx.currentTime);
-        osciladorSirene.connect(ganhoSirene);
-        ganhoSirene.connect(audioCtx.destination);
-        osciladorSirene.start();
-        sireneTocando = true;
-        intervaloSirene = setInterval(() => {
-            if (!sireneTocando || !audioCtx) return;
-            osciladorSirene.frequency.linearRampToValueAtTime(tomSireneAlta ? 750 : 550, audioCtx.currentTime + 0.1);
-            tomSireneAlta = !tomSireneAlta;
-        }, 600);
-    } catch(e) { console.error(e); }
-}
-
-function desligarSirene() {
-    if (intervaloSirene) { clearInterval(intervaloSirene); intervaloSirene = null; }
-    if (osciladorSirene) { try { osciladorSirene.stop(); osciladorSirene.disconnect(); } catch(e){} osciladorSirene = null; }
-    if (ganhoSirene) { try { ganhoSirene.disconnect(); } catch(e){} ganhoSirene = null; }
-    sireneTocando = false;
-}
-
-function gerenciarSirenePorCheckbox() {
-    if (!document.getElementById("alarme").checked) desligarSirene();
-}
-
-function desenharGraficoIndividual(id, index) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    
-    el.width = el.clientWidth;
-    el.height = el.clientHeight;
-    const ctx = el.getContext("2d");
-    const w = el.width;
-    const h = el.height;
-
-    const margemEsquerda = 45; 
-    const margemDireita = 15;  
-    const margemBase = 18;
-    const margemTopo = 8;
-    const largGrafico = w - margemEsquerda - margemDireita;
-    const altGrafico = h - margemTopo - margemBase;
-
-    ctx.fillStyle = "#090d16";
-    ctx.fillRect(0, 0, w, h);
-    ctx.fillRect(margemEsquerda, margemTopo, largGrafico, altGrafico);
-
-    ctx.strokeStyle = "rgba(16, 185, 129, 0.04)";
-    ctx.lineWidth = 1;
-
-    let qteDivisoesX = 8; 
-    for (let i = 0; i <= qteDivisoesX; i++) {
-        let x = margemEsquerda + i * (largGrafico / qteDivisoesX);
-        ctx.beginPath(); ctx.moveTo(x, margemTopo); ctx.lineTo(x, h - margemBase); ctx.stroke();
-    }
-
-    let qteDivisoesY = 3; 
-    ctx.fillStyle = "rgba(156, 163, 175, 0.8)";
-    ctx.font = "9px monospace";
-    ctx.textAlign = "right"; 
-    ctx.textBaseline = "middle";
-
-    for (let i = 0; i <= qteDivisoesY; i++) {
-        let y = margemTopo + i * (altGrafico / qteDivisoesY);
-        ctx.beginPath(); ctx.moveTo(margemEsquerda, y); ctx.lineTo(w - margemDireita, y); ctx.stroke();
-        let valorTempY = Math.round(TEMP_MAX - (i * ((TEMP_MAX - TEMP_MIN) / qteDivisoesY)));
-        ctx.fillText(valorTempY + "°C", margemEsquerda - 5, y);
-    }
-
-    ctx.textAlign = "center";
-    ctx.textBaseline = "top";
-    for (let i = 0; i <= qteDivisoesX; i++) {
-        let x = margemEsquerda + i * (largGrafico / qteDivisoesX);
-        let tempoRelativo = Math.round(-20 + (i * (20 / qteDivisoesX)));
-        ctx.fillText(tempoRelativo === 0 ? "Agora" : tempoRelativo + "s", x, h - margemBase + 3);
-    }
-
-    let hist = historicos[index];
-    if (hist.length > 1) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(margemEsquerda, margemTopo, largGrafico, altGrafico);
-        ctx.clip();
-
-        let limiteAtencao = parseInt(document.getElementById("limiteAtencao").value) || 40;
-        let limitePerigo = parseInt(document.getElementById("limitePerigo").value) || 70;
-        let corLinha = "#3b82f6"; 
-        
-        let valorAtual = ultimosValores[index];
-        if (valorAtual >= limitePerigo) corLinha = "#ef4444";
-        else if (valorAtual >= limiteAtencao) corLinha = "#f59e0b";
-
-        ctx.strokeStyle = corLinha;
-        ctx.lineWidth = 1.8;
-        ctx.shadowBlur = 4;
-        ctx.shadowColor = corLinha;
-
-        ctx.beginPath();
-        for (let i = 0; i < hist.length; i++) {
-            let x = margemEsquerda + (i / 300) * largGrafico;
-            let y = (h - margemBase) - ((hist[i] - TEMP_MIN) / (TEMP_MAX - TEMP_MIN)) * altGrafico;
-            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  <script>
+    // Inicialização do Gráfico Chart.js
+    const ctx = document.getElementById('chartRssi').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'RSSI Filtrado (dBm)', borderColor: '#38bdf8', data: [], tension: 0.2, pointRadius: 2 },
+          { label: 'Referência (dBm)', borderColor: '#eab308', borderDash: [4, 4], data: [], pointRadius: 0 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f8fafc', boxWidth: 10, font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#1e293b' } },
+          y: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#334155' } }
         }
-        ctx.stroke();
-        ctx.restore();
-    }
-}
+      }
+    });
 
-function desenharTodosOsGraficos() {
-    canvasIds.forEach((id, index) => desenharGraficoIndividual(id, index));
-}
+    // Configuração MQTT
+    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
+      clientId: "web_radar_" + Math.random().toString(16).substr(2, 8)
+    });
 
-function atualizar(valoresReais) {
-    if(!Array.isArray(valoresReais)){
-        valoresReais = [valoresReais, valoresReais * 0.9, valoresReais * 1.1]; 
-    }
-    
-    ultimoValorBrutoRef = valoresReais[0];
-    let dispararAlarme = false;
-    let limitePerigo = parseInt(document.getElementById("limitePerigo").value) || 70;
+    const topicData = "casa/radar/data";
+    const topicCmd  = "casa/radar/cmd";
 
-    for(let i = 0; i < 3; i++) {
-        let valorBruto = valoresReais[i] !== undefined ? valoresReais[i] : 0;
-        let valorCalibrado = i === 0 ? (valorBruto - offsetCalibracao) : valorBruto;
-        
-        ultimosValores[i] = valorCalibrado;
+    const dotWeb = document.getElementById('dotWeb');
+    const txtWeb = document.getElementById('txtWeb');
 
-        if (historicos[i].length === 0 || valorCalibrado > picos[i]) {
-            picos[i] = valorCalibrado;
+    client.on("connect", () => {
+      dotWeb.className = "dot online";
+      txtWeb.textContent = "Online";
+      client.subscribe(topicData);
+    });
+
+    client.on("offline", () => {
+      dotWeb.className = "dot";
+      txtWeb.textContent = "Offline";
+    });
+
+    // Processa payloads JSON vindo do ESP32
+    client.on("message", (topic, message) => {
+      if (topic === topicData) {
+        try {
+          const data = JSON.parse(message.toString());
+          
+          document.getElementById('valRssi').innerText = data.rssi.toFixed(1) + " dBm";
+          document.getElementById('valRef').innerText  = data.ref.toFixed(1) + " dBm";
+          document.getElementById('valDelta').innerText = data.delta.toFixed(1) + " dB";
+          document.getElementById('valEstado').innerText = data.estado;
+
+          // Atualiza LEDs indicativos
+          document.getElementById('ledVerde').className = 'led green' + (data.estado === 'AUSENTE' ? ' active' : '');
+          document.getElementById('ledAmarelo').className = 'led yellow' + (data.estado === 'CALIBRANDO' || data.estado === 'SUSPEITA' ? ' active' : '');
+          document.getElementById('ledVermelho').className = 'led red' + (data.estado === 'PRESENCA' ? ' active' : '');
+
+          // Atualiza Gráfico
+          let hora = new Date().toLocaleTimeString();
+          if (chart.data.labels.length > 25) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+            chart.data.datasets[1].data.shift();
+          }
+          chart.data.labels.push(hora);
+          chart.data.datasets[0].data.push(data.rssi);
+          chart.data.datasets[1].data.push(data.ref);
+          chart.update('none');
+
+        } catch (e) {
+          console.error("Erro ao ler JSON:", e);
         }
+      }
+    });
 
-        historicos[i].push(valorCalibrado);
-        if (historicos[i].length > 300) historicos[i].shift();
-        
-        let elTxt = document.getElementById("valTxt" + (i + 1));
-        if (elTxt) elTxt.innerHTML = Math.round(valorCalibrado) + "°C";
-        
-        if (valorCalibrado >= limitePerigo) dispararAlarme = true;
+    function enviarConfiguracao() {
+      const ent = document.getElementById('cfgEntrada').value;
+      const sai = document.getElementById('cfgSaida').value;
+      const cmd = JSON.stringify({ limiarEntrada: parseFloat(ent), limiarSaida: parseFloat(sai) });
+      
+      client.publish(topicCmd, cmd);
+      alert("Configurações enviadas via MQTT!");
     }
-
-    if (dispararAlarme) ligarSirene(); else desligarSirene();
-
-    desenharTodosOsGraficos();
-}
-
-async function conectarArduino() {
-    try {
-        porta = await navigator.serial.requestPort();
-        await porta.open({ baudRate: 115200 });
-        let st = document.getElementById("status");
-        st.innerHTML = "ONLINE";
-        st.className = "conectado";
-
-        const decoder = new TextDecoderStream();
-        porta.readable.pipeTo(decoder.writable);
-        leitor = decoder.readable.getReader();
-
-        let buffer = "";
-        while (true) {
-            const { value, done } = await leitor.read();
-            if (done) break;
-            buffer += value;
-            let linhas = buffer.split("\n");
-            buffer = linhas.pop();
-            for (let linha of linhas) {
-                linha = linha.trim();
-                if(linha.length === 0) continue;
-                
-                let partes = linha.split(/[\s,]+/); // Linha corrigida e limpa aqui!
-                let leituras = partes.map(p => parseFloat(p)).filter(n => !isNaN(n));
-                
-                if (leituras.length > 0) {
-                    atualizar(leituras);
-                }
-            }
-        }
-    } catch (e) {
-        let st = document.getElementById("status");
-        st.innerHTML = "ERRO"; st.className = "";
-    }
-}
-
-window.onload = () => {
-    let offset = localStorage.getItem("thermo_offset");
-    if (offset) offsetCalibracao = parseInt(offset);
-
-    let limiteAtencaoSalvo = localStorage.getItem("thermo_limiteAtencao");
-    let limitePerigoSalvo = localStorage.getItem("thermo_limitePerigo");
-    if (limiteAtencaoSalvo) document.getElementById("limiteAtencao").value = limiteAtencaoSalvo;
-    if (limitePerigoSalvo) document.getElementById("limitePerigo").value = limitePerigoSalvo;
-
-    desenharTodosOsGraficos();
-};
-
-window.addEventListener("resize", desenharTodosOsGraficos);
-</script>
+  </script>
 </body>
 </html>
