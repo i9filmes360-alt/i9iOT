@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>EVA RADAR RF - Dashboard MQTT</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -22,86 +23,103 @@
     html, body {
       width: 100%;
       height: 100vh;
-      height: 100dvh;
-      overflow: hidden;
+      height: 100dvh; /* Garante tamanho exato sem barra de navegação do celular */
+      overflow: hidden; /* Força zero rolagem */
       background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 80%);
       color: var(--text);
       font-family: system-ui, -apple-system, sans-serif;
-      padding: 12px;
+      padding: 8px;
     }
 
     .container {
       width: 100%;
       height: 100%;
-      max-width: 480px;
+      max-width: 900px;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      justify-content: center;
+      gap: 8px;
     }
 
     header {
       background: var(--card);
-      padding: 10px 14px;
-      border-radius: 12px;
+      padding: 6px 12px;
+      border-radius: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
     }
-    h1 { font-size: 1.05rem; color: var(--accent); font-weight: 700; }
+    h1 { font-size: 0.95rem; color: var(--accent); font-weight: 700; }
     
     .status-badge {
-      display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: var(--muted);
-      background: #0f172a; padding: 4px 10px; border-radius: 12px;
+      display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--muted);
+      background: #0f172a; padding: 4px 8px; border-radius: 12px;
     }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #334155; }
-    .dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: #334155; }
+    .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+    .grid-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-height: 0; /* Previne overflow do flex */
+    }
+
+    @media (min-width: 768px) {
+      .grid-main { display: grid; grid-template-columns: 300px 1fr; }
+    }
 
     .card {
       background: var(--card);
-      border-radius: 14px;
-      padding: 14px;
+      border-radius: 12px;
+      padding: 10px;
       box-shadow: var(--shadow);
       border: 1px solid rgba(255,255,255,0.05);
       display: flex;
       flex-direction: column;
+      justify-content: center;
     }
-    .card h2 { font-size: 0.8rem; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .card h2 { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
 
-    .leds { display: flex; justify-content: space-around; background: #0f172a; padding: 10px; border-radius: 10px; margin-bottom: 12px; }
-    .led-box { text-align: center; font-size: 0.65rem; color: var(--muted); font-weight: bold; }
-    .led { width: 18px; height: 18px; border-radius: 50%; background: #334155; margin: 0 auto 4px; transition: all 0.3s; }
-    .led.green.active { background: var(--green); box-shadow: 0 0 12px var(--green); }
-    .led.yellow.active { background: var(--yellow); box-shadow: 0 0 12px var(--yellow); }
-    .led.red.active { background: var(--red); box-shadow: 0 0 12px var(--red); }
+    .leds { display: flex; justify-content: space-around; background: #0f172a; padding: 6px; border-radius: 8px; margin-bottom: 6px; }
+    .led-box { text-align: center; font-size: 0.6rem; color: var(--muted); font-weight: bold; }
+    .led { width: 14px; height: 14px; border-radius: 50%; background: #334155; margin: 0 auto 2px; transition: all 0.3s; }
+    .led.green.active { background: var(--green); box-shadow: 0 0 10px var(--green); }
+    .led.yellow.active { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
+    .led.red.active { background: var(--red); box-shadow: 0 0 10px var(--red); }
 
     .metrics-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 6px 16px;
+      gap: 4px 12px;
     }
-    .metric { display: flex; justify-content: space-between; padding: 6px 0; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .metric { display: flex; justify-content: space-between; padding: 2px 0; font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
     .metric span:last-child { font-weight: 700; color: var(--accent); }
 
     .controls-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 6px;
     }
+    .form-group { margin-bottom: 0; }
     .form-group.full { grid-column: span 2; }
-    .form-group label { display: block; font-size: 0.7rem; color: var(--muted); margin-bottom: 4px; }
+    .form-group label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 2px; }
     .form-group select, .form-group input {
-      width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #fff; font-size: 0.85rem;
+      width: 100%; padding: 5px 8px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 0.75rem;
     }
     
     .btn {
       grid-column: span 2;
-      width: 100%; background: var(--accent); color: #000; border: none; padding: 12px;
-      border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.85rem; margin-top: 4px;
+      width: 100%; background: var(--accent); color: #000; border: none; padding: 8px;
+      border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem; margin-top: 2px;
     }
     .btn:active { opacity: 0.8; }
+
+    .chart-card { flex: 1; min-height: 0; justify-content: flex-start; }
+    .chart-box { flex: 1; position: relative; width: 100%; height: 100%; min-height: 0; }
   </style>
 </head>
 <body>
@@ -115,52 +133,84 @@
       </div>
     </header>
 
-    <!-- Status Card -->
-    <div class="card">
-      <h2>Status do Sistema</h2>
-      <div class="leds">
-        <div class="led-box"><div id="ledVerde" class="led green"></div>AUSENTE</div>
-        <div class="led-box"><div id="ledAmarelo" class="led yellow"></div>SUSPEITA</div>
-        <div class="led-box"><div id="ledVermelho" class="led red"></div>PRESENÇA</div>
+    <div class="grid-main">
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <!-- Status Card -->
+        <div class="card">
+          <h2>Status do Sistema</h2>
+          <div class="leds">
+            <div class="led-box"><div id="ledVerde" class="led green"></div>AUSENTE</div>
+            <div class="led-box"><div id="ledAmarelo" class="led yellow"></div>SUSPEITA</div>
+            <div class="led-box"><div id="ledVermelho" class="led red"></div>PRESENÇA</div>
+          </div>
+
+          <div class="metrics-grid">
+            <div class="metric"><span>Fonte:</span><span id="valModo">--</span></div>
+            <div class="metric"><span>Estado:</span><span id="valEstado">OFFLINE</span></div>
+            <div class="metric"><span>RSSI:</span><span id="valRssi">0 dBm</span></div>
+            <div class="metric"><span>Delta:</span><span id="valDelta">0 dB</span></div>
+            <div class="metric" style="grid-column: span 2;"><span>Referência:</span><span id="valRef">0 dBm</span></div>
+          </div>
+        </div>
+
+        <!-- Ajustes Card -->
+        <div class="card">
+          <h2>Ajustes Remotos</h2>
+          <div class="controls-grid">
+            <div class="form-group full">
+              <label>Fonte de Sinal RSSI:</label>
+              <select id="cfgFonteSinal">
+                <option value="TX">ESP32 TX (Pacotes UDP)</option>
+                <option value="WIFI">Wi-Fi Local (Roteador)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label>Limiar Ent. (dBm):</label>
+              <input type="number" step="0.1" id="cfgEntrada" value="3.5">
+            </div>
+            
+            <div class="form-group">
+              <label>Limiar Saída (dBm):</label>
+              <input type="number" step="0.1" id="cfgSaida" value="1.8">
+            </div>
+
+            <button class="btn" onclick="enviarConfiguracao()">Aplicar Configuração</button>
+          </div>
+        </div>
       </div>
 
-      <div class="metrics-grid">
-        <div class="metric"><span>Fonte:</span><span id="valModo">--</span></div>
-        <div class="metric"><span>Estado:</span><span id="valEstado">OFFLINE</span></div>
-        <div class="metric"><span>RSSI:</span><span id="valRssi">0 dBm</span></div>
-        <div class="metric"><span>Delta:</span><span id="valDelta">0 dB</span></div>
-        <div class="metric" style="grid-column: span 2;"><span>Referência:</span><span id="valRef">0 dBm</span></div>
-      </div>
-    </div>
-
-    <!-- Ajustes Card -->
-    <div class="card">
-      <h2>Ajustes Remotos</h2>
-      <div class="controls-grid">
-        <div class="form-group full">
-          <label>Fonte de Sinal RSSI:</label>
-          <select id="cfgFonteSinal">
-            <option value="TX">ESP32 TX (Pacotes UDP)</option>
-            <option value="WIFI">Wi-Fi Local (Roteador)</option>
-          </select>
+      <!-- Gráfico Card -->
+      <div class="card chart-card">
+        <h2>Sinal RF em Tempo Real</h2>
+        <div class="chart-box">
+          <canvas id="chartRssi"></canvas>
         </div>
-
-        <div class="form-group">
-          <label>Limiar Ent. (dBm):</label>
-          <input type="number" step="0.1" id="cfgEntrada" value="3.5">
-        </div>
-        
-        <div class="form-group">
-          <label>Limiar Saída (dBm):</label>
-          <input type="number" step="0.1" id="cfgSaida" value="1.8">
-        </div>
-
-        <button class="btn" onclick="enviarConfiguracao()">Aplicar Configuração</button>
       </div>
     </div>
   </div>
 
   <script>
+    const ctx = document.getElementById('chartRssi').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'RSSI (dBm)', borderColor: '#38bdf8', data: [], tension: 0.2, pointRadius: 1 },
+          { label: 'Ref (dBm)', borderColor: '#eab308', borderDash: [3, 3], data: [], pointRadius: 0 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f8fafc', boxWidth: 8, font: { size: 9 } } } },
+        scales: {
+          x: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { color: '#1e293b' } },
+          y: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { color: '#334155' } }
+        }
+      }
+    });
+
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: "web_radar_" + Math.random().toString(16).substr(2, 8)
     });
@@ -181,14 +231,25 @@
         
         if (topic === topicData) {
           document.getElementById('valModo').innerText  = data.fonte || "TX";
-          document.getElementById('valRssi').innerText  = data.rssi.toFixed(1) + " dBm";
-          document.getElementById('valRef').innerText   = data.ref.toFixed(1) + " dBm";
-          document.getElementById('valDelta').innerText = data.delta.toFixed(1) + " dB";
+          document.getElementById('valRssi').innerText  = data.rssi.toFixed(1);
+          document.getElementById('valRef').innerText   = data.ref.toFixed(1);
+          document.getElementById('valDelta').innerText = data.delta.toFixed(1);
           document.getElementById('valEstado').innerText= data.estado;
 
           document.getElementById('ledVerde').className = 'led green' + (data.estado === 'AUSENTE' ? ' active' : '');
           document.getElementById('ledAmarelo').className = 'led yellow' + (data.estado === 'CALIBRANDO' || data.estado === 'SUSPEITA' ? ' active' : '');
           document.getElementById('ledVermelho').className = 'led red' + (data.estado === 'PRESENCA' ? ' active' : '');
+
+          let hora = new Date().toLocaleTimeString();
+          if (chart.data.labels.length > 20) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+            chart.data.datasets[1].data.shift();
+          }
+          chart.data.labels.push(hora);
+          chart.data.datasets[0].data.push(data.rssi);
+          chart.data.datasets[1].data.push(data.ref);
+          chart.update('none');
         } 
         else if (topic === topicCmd) {
           if (data.fonte !== undefined) document.getElementById('cfgFonteSinal').value = data.fonte;
