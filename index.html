@@ -112,7 +112,7 @@
         </div>
 
         <div class="card">
-          <h2>Configurações Remotas</h2>
+          <h2>Ajustes Remotos</h2>
           
           <div class="form-group">
             <label>Fonte de Sinal RSSI:</label>
@@ -147,6 +147,7 @@
   </div>
 
   <script>
+    // Configuração do Gráfico Chart.js
     const ctx = document.getElementById('chartRssi').getContext('2d');
     const chart = new Chart(ctx, {
       type: 'line',
@@ -167,6 +168,7 @@
       }
     });
 
+    // Conexão MQTT via WebSockets
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
       clientId: "web_radar_" + Math.random().toString(16).substr(2, 8)
     });
@@ -177,14 +179,18 @@
     client.on("connect", () => {
       document.getElementById('dotWeb').className = "dot online";
       document.getElementById('txtWeb').textContent = "Online";
+      
+      // Assina os dois tópicos: Dados do Radar e Comandos de Controle
       client.subscribe(topicData);
+      client.subscribe(topicCmd);
     });
 
     client.on("message", (topic, message) => {
-      if (topic === topicData) {
-        try {
-          const data = JSON.parse(message.toString());
-          
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // 1. Recebimento de TELEMETRIA (atualiza gráficos e cards)
+        if (topic === topicData) {
           document.getElementById('valModo').innerText  = data.fonte || "TX";
           document.getElementById('valRssi').innerText  = data.rssi.toFixed(1) + " dBm";
           document.getElementById('valRef').innerText   = data.ref.toFixed(1) + " dBm";
@@ -205,19 +211,33 @@
           chart.data.datasets[0].data.push(data.rssi);
           chart.data.datasets[1].data.push(data.ref);
           chart.update('none');
-        } catch (e) { console.error(e); }
-      }
+        } 
+        
+        // 2. Recebimento de COMANDOS (Espelhamento nos outros dispositivos)
+        else if (topic === topicCmd) {
+          if (data.fonte !== undefined) {
+            document.getElementById('cfgFonteSinal').value = data.fonte;
+          }
+          if (data.limiarEntrada !== undefined) {
+            document.getElementById('cfgEntrada').value = data.limiarEntrada;
+          }
+          if (data.limiarSaida !== undefined) {
+            document.getElementById('cfgSaida').value = data.limiarSaida;
+          }
+        }
+      } catch (e) { console.error(e); }
     });
 
+    // Publica alterações e sincroniza telas
     function enviarConfiguracao() {
       const fonte = document.getElementById('cfgFonteSinal').value;
-      const ent   = document.getElementById('cfgEntrada').value;
-      const sai   = document.getElementById('cfgSaida').value;
+      const ent   = parseFloat(document.getElementById('cfgEntrada').value);
+      const sai   = parseFloat(document.getElementById('cfgSaida').value);
       
       const cmd = JSON.stringify({
         fonte: fonte,
-        limiarEntrada: parseFloat(ent),
-        limiarSaida: parseFloat(sai)
+        limiarEntrada: ent,
+        limiarSaida: sai
       });
       
       client.publish(topicCmd, cmd);
