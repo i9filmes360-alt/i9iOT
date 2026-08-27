@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Medidor de Energia - ESP32</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { 
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box; 
+    }
+    
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    body {
+      font-family: 'Orbitron', sans-serif;
+      background: linear-gradient(135deg, #0a0e17, #1a253a);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 0;
+      margin: 0;
+    }
+
+    /* Efeito de partículas no fundo */
+    .particles {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+    }
+
+    .particle {
+      position: absolute;
+      background: rgba(0, 204, 255, 0.3);
+      border-radius: 50%;
+      animation: float 15s infinite linear;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0) translateX(0); }
+      50% { transform: translateY(-20px) translateX(10px); }
+      100% { transform: translateY(0) translateX(0); }
+    }
+
+    /* Container principal estilo multímetro */
+    .multimeter {
+      width: 95%;
+      max-width: 900px;
+      background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 
+        0 0 0 3px #333,
+        0 0 0 6px #555,
+        0 15px 30px rgba(0, 0, 0, 0.7),
+        inset 0 2px 5px rgba(255, 255, 255, 0.1);
+      position: relative;
+      border: 1px solid #444;
+    }
+
+    /* Painel superior do multímetro */
+    .multimeter-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #444;
+    }
+
+    .multimeter-title {
+      font-size: 1.5em;
+      font-weight: 700;
+      color: #00ccff;
+      text-shadow: 0 0 8px rgba(0, 204, 255, 0.7);
+      letter-spacing: 1px;
+    }
+
+    .multimeter-brand {
+      font-size: 1em;
+      color: #ff6b6b;
+      font-weight: 700;
+    }
+
+    /* Display principal estilo LCD */
+    .main-display {
+      background: linear-gradient(to bottom, #0a3c2f, #0d523f);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+      box-shadow: 
+        inset 0 0 15px rgba(0, 0, 0, 0.8),
+        0 4px 12px rgba(0, 0, 0, 0.5);
+      border: 3px solid #1a1a1a;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .display-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 15px;
+    }
+
+    .display-segment {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      border: 2px solid #2a7a5f;
+    }
+
+    .segment-title {
+      font-size: 0.9em;
+      color: #4cdbc4;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .segment-value {
+      font-size: 1.8em;
+      font-weight: 900;
+      color: #7effdb;
+      text-shadow: 0 0 8px rgba(126, 255, 219, 0.5);
+      min-height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      padding: 5px;
+    }
+
+    /* Painel de controles */
+    .controls-panel {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      padding-top: 15px;
+      border-top: 2px solid #444;
+    }
+
+    /* Botão de reset integrado ao multímetro */
+    .multimeter-button {
+      background: linear-gradient(145deg, #ff6b6b, #ff4757);
+      border: none;
+      border-radius: 50%;
+      width: 70px;
+      height: 70px;
+      color: white;
+      font-size: 0.8em;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 
+        0 4px 12px rgba(0, 0, 0, 0.5),
+        inset 0 2px 4px rgba(255, 255, 255, 0.2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .multimeter-button:hover {
+      transform: scale(1.05);
+      box-shadow: 
+        0 6px 15px rgba(255, 107, 107, 0.6),
+        inset 0 2px 4px rgba(255, 255, 255, 0.3);
+    }
+
+    .multimeter-button:active {
+      transform: scale(0.98);
+      box-shadow: 
+        0 2px 8px rgba(255, 107, 107, 0.6),
+        inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .button-icon {
+      font-size: 1.5em;
+      margin-bottom: 4px;
+    }
+
+    /* Indicadores menores */
+    .indicators {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .indicator {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+      min-width: 130px;
+      border: 2px solid #444;
+    }
+
+    .indicator-title {
+      font-size: 0.8em;
+      color: #aaa;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .indicator-value {
+      font-size: 1.1em;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    /* Logo Wellcon estilizado */
+    .wellcon-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+      min-width: 160px;
+      min-height: 120px;
+      border: 2px solid #444;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .wellcon-text {
+      font-family: 'Russo One', sans-serif;
+      font-size: 2em;
+      font-weight: bold;
+      background: linear-gradient(45deg, #00ccff, #00ffaa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 12px rgba(0, 204, 255, 0.5);
+      letter-spacing: 2px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .wellcon-subtitle {
+      font-size: 0.7em;
+      color: #aaa;
+      margin-top: 4px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .wellcon-logo::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(0, 204, 255, 0.1) 0%, transparent 70%);
+      z-index: 1;
+      animation: rotate 10s linear infinite;
+    }
+
+    @keyframes rotate {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Status de conexão */
+    .connection-status {
+      display: flex;
+      align-items: center;
+      margin-top: 15px;
+      font-size: 0.8em;
+      color: #aaa;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff4757;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+
+    .status-dot.connected {
+      background: #2ed573;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    /* Modal de senha */
+    .password-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .password-container {
+      background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
+      border-radius: 15px;
+      padding: 30px;
+      width: 90%;
+      max-width: 400px;
+      box-shadow: 0 0 30px rgba(0, 0, 0, 0.7);
+      border: 2px solid #444;
+      text-align: center;
+    }
+
+    .password-title {
+      font-size: 1.5em;
+      color: #00ccff;
+      margin-bottom: 20px;
+      text-shadow: 0 0 10px rgba(0, 204, 255, 0.7);
+    }
+
+    .password-input {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      border: 2px solid #444;
+      border-radius: 8px;
+      color: white;
+      font-size: 1.2em;
+      text-align: center;
+      font-family: 'Orbitron', sans-serif;
+      outline: none;
+    }
+
+    .password-input:focus {
+      border-color: #00ccff;
+      box-shadow: 0 0 10px rgba(0, 204, 255, 0.5);
+    }
+
+    .password-buttons {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .password-button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1em;
+      cursor: pointer;
+      transition: all 0.3s;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .password-confirm {
+      background: linear-gradient(145deg, #2ed573, #1dd1a1);
+      color: white;
+    }
+
+    .password-cancel {
+      background: linear-gradient(145deg, #ff6b6b, #ff4757);
+      color: white;
+    }
+
+    .password-button:hover {
+      transform: scale(1.05);
+    }
+
+    /* Botão de tela cheia */
+    .fullscreen-button {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      color: white;
+      font-size: 1.2em;
+      cursor: pointer;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s;
+    }
+
+    .fullscreen-button:hover {
+      background: rgba(0, 0, 0, 0.7);
+      transform: scale(1.1);
+    }
+
+    /* Responsividade */
+    @media (max-width: 768px) {
+      .display-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .controls-panel {
+        flex-direction: column;
+        gap: 15px;
+      }
+      
+      .indicators {
+        width: 100%;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      
+      .wellcon-logo {
+        min-width: 140px;
+        min-height: 100px;
+      }
+      
+      .wellcon-text {
+        font-size: 1.8em;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .multimeter {
+        padding: 15px;
+      }
+      
+      .multimeter-title {
+        font-size: 1.3em;
+      }
+      
+      .segment-value {
+        font-size: 1.5em;
+        min-height: 40px;
+      }
+      
+      .indicators {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .indicator, .wellcon-logo {
+        width: 100%;
+      }
+      
+      .wellcon-text {
+        font-size: 1.6em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Botão de tela cheia -->
+  <button class="fullscreen-button" id="fullscreen-btn">
+    <i class="fas fa-expand"></i>
+  </button>
+
+  <!-- Efeito de partículas no fundo -->
+  <div class="particles" id="particles"></div>
+
+  <!-- Modal de senha -->
+  <div class="password-modal" id="password-modal">
+    <div class="password-container">
+      <div class="password-title">DIGITE A SENHA PARA RESETAR</div>
+      <input type="password" class="password-input" id="password-input" placeholder="Senha" autocomplete="off">
+      <div class="password-buttons">
+        <button class="password-button password-confirm" id="password-confirm">Confirmar</button>
+        <button class="password-button password-cancel" id="password-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Multímetro -->
+  <div class="multimeter">
+    <div class="multimeter-header">
+      <div class="multimeter-title">MEDIDOR DE ENERGIA</div>
+      <div class="multimeter-brand">ESP32 PRO</div>
+    </div>
+    
+    <!-- Display principal -->
+    <div class="main-display">
+      <div class="display-grid">
+        <div class="display-segment">
+          <div class="segment-title">Corrente</div>
+          <div id="corrente" class="segment-value">-- A</div>
+        </div>
+        
+        <div class="display-segment">
+          <div class="segment-title">Potência</div>
+          <div id="potencia" class="segment-value">-- W</div>
+        </div>
+        
+        <div class="display-segment">
+          <div class="segment-title">Energia</div>
+          <div id="kwh" class="segment-value">-- kWh</div>
+        </div>
+        
+        <div class="display-segment">
+          <div class="segment-title">Custo</div>
+          <div id="custo" class="segment-value">R$ --</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Painel de controles -->
+    <div class="controls-panel">
+      <div class="indicators">
+        <div class="indicator">
+          <div class="indicator-title">Data/Hora</div>
+          <div id="hora" class="indicator-value">--:--:--</div>
+        </div>
+        
+        <!-- Logo Wellcon no lugar do círculo -->
+        <div class="wellcon-logo">
+          <div class="wellcon-text">WELLCON</div>
+          <div class="wellcon-subtitle">Soluções em Energia</div>
+        </div>
+      </div>
+      
+      <!-- Botão de reset integrado ao multímetro -->
+      <button class="multimeter-button" id="reset-button">
+        <i class="fas fa-redo button-icon"></i>
+        Reset
+      </button>
+    </div>
+    
+    <div class="connection-status">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-text">Conectando ao broker MQTT...</span>
+    </div>
+  </div>
+
+  <script>
+    // Criar partículas de fundo
+    function createParticles() {
+      const particlesContainer = document.getElementById('particles');
+      const particleCount = 15;
+      
+      for (let i = 0; i < particleCount; i++) {
+        const particle = document.createElement('div');
+        particle.classList.add('particle');
+        
+        // Tamanho aleatório
+        const size = Math.random() * 3 + 1;
+        particle.style.width = `${size}px`;
+        particle.style.height = `${size}px`;
+        
+        // Posição aleatória
+        particle.style.left = `${Math.random() * 100}%`;
+        particle.style.top = `${Math.random() * 100}%`;
+        
+        // Atraso de animação aleatório
+        particle.style.animationDelay = `${Math.random() * 15}s`;
+        
+        particlesContainer.appendChild(particle);
+      }
+    }
+    
+    // Conectar ao MQTT
+    const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt");
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+    client.on("connect", function() {
+      console.log("Conectado ao broker MQTT");
+      statusDot.classList.add('connected');
+      statusText.textContent = "Conectado ao broker MQTT";
+      
+      client.subscribe("neto/forno/corrente");
+      client.subscribe("neto/forno/potencia");
+      client.subscribe("neto/forno/kwh");
+      client.subscribe("neto/forno/custo");
+    });
+
+    client.on("message", function(topic, message) {
+      const msg = message.toString();
+      
+      if (topic === "neto/forno/corrente") {
+        document.getElementById("corrente").innerText = msg + " A";
+      }
+      
+      if (topic === "neto/forno/potencia") {
+        document.getElementById("potencia").innerText = msg + " W";
+      }
+      
+      if (topic === "neto/forno/kwh") {
+        document.getElementById("kwh").innerText = msg + " kWh";
+      }
+      
+      if (topic === "neto/forno/custo") {
+        document.getElementById("custo").innerText = "R$ " + parseFloat(msg).toFixed(2);
+      }
+    });
+
+    client.on("error", function() {
+      statusDot.classList.remove('connected');
+      statusText.textContent = "Erro de conexão MQTT";
+    });
+
+    client.on("offline", function() {
+      statusDot.classList.remove('connected');
+      statusText.textContent = "Desconectado do broker MQTT";
+    });
+
+    // Função para abrir o modal de senha
+    function openPasswordModal() {
+      const modal = document.getElementById('password-modal');
+      const passwordInput = document.getElementById('password-input');
+      
+      modal.style.display = 'flex';
+      passwordInput.value = '';
+      passwordInput.focus();
+    }
+
+    // Função para fechar o modal de senha
+    function closePasswordModal() {
+      const modal = document.getElementById('password-modal');
+      modal.style.display = 'none';
+    }
+
+    // Função para verificar a senha e resetar
+    function checkPasswordAndReset() {
+      const passwordInput = document.getElementById('password-input');
+      const password = passwordInput.value;
+      const correctPassword = "iptu676466";
+      
+      if (password === correctPassword) {
+        // Senha correta - resetar kWh
+        client.publish("neto/forno/reset", "RESET");
+        
+        // Efeito visual de confirmação
+        const button = document.getElementById('reset-button');
+        const originalHTML = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check button-icon"></i> OK!';
+        button.style.background = 'linear-gradient(145deg, #2ed573, #1dd1a1)';
+        
+        setTimeout(() => {
+          button.innerHTML = originalHTML;
+          button.style.background = 'linear-gradient(145deg, #ff6b6b, #ff4757)';
+        }, 2000);
+        
+        closePasswordModal();
+      } else {
+        // Senha incorreta - mostrar erro
+        passwordInput.value = '';
+        passwordInput.placeholder = 'Senha incorreta! Tente novamente';
+        passwordInput.style.borderColor = '#ff4757';
+        passwordInput.style.boxShadow = '0 0 10px rgba(255, 71, 87, 0.5)';
+        
+        setTimeout(() => {
+          passwordInput.placeholder = 'Senha';
+          passwordInput.style.borderColor = '#444';
+          passwordInput.style.boxShadow = 'none';
+        }, 2000);
+      }
+    }
+
+    // Configurar eventos dos botões
+    document.getElementById('reset-button').addEventListener('click', openPasswordModal);
+    document.getElementById('password-confirm').addEventListener('click', checkPasswordAndReset);
+    document.getElementById('password-cancel').addEventListener('click', closePasswordModal);
+    
+    // Permitir enviar com Enter
+    document.getElementById('password-input').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        checkPasswordAndReset();
+      }
+    });
+
+    // Fechar modal ao clicar fora
+    document.getElementById('password-modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closePasswordModal();
+      }
+    });
+
+    // Função para tela cheia
+    function toggleFullscreen() {
+      const fullscreenBtn = document.getElementById('fullscreen-btn');
+      
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          console.log(`Erro ao tentar entrar em tela cheia: ${err.message}`);
+        });
+        fullscreenBtn.innerHTML = '<i class="fas fa-compress"></i>';
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+          fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+        }
+      }
+    }
+
+    // Evento para o botão de tela cheia
+    document.getElementById('fullscreen-btn').addEventListener('click', toggleFullscreen);
+
+    // Atualizar ícone quando sair da tela cheia
+    document.addEventListener('fullscreenchange', function() {
+      const fullscreenBtn = document.getElementById('fullscreen-btn');
+      if (!document.fullscreenElement) {
+        fullscreenBtn.innerHTML = '<i class="fas fa-expand"></i>';
+      }
+    });
+
+    function atualizarHora() {
+      const now = new Date();
+      document.getElementById("hora").innerText = now.toLocaleString('pt-BR', { 
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false 
+      });
+    }
+    
+    // Inicializar
+    createParticles();
+    setInterval(atualizarHora, 1000);
+    atualizarHora();
+  </script>
+</body>
+</html>
