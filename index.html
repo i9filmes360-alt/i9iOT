@@ -1,510 +1,723 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle do Relé</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <title>EVA RADAR RF - Web Serial Controller</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    
+    html, body {
+      height: 100vh;
+      margin: 0;
+      padding: 12px 18px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-        }
+    .app-wrapper {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+      gap: 12px;
+    }
 
-        .container {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(10px);
-            border-radius: 30px;
-            padding: 40px;
-            width: 90%;
-            max-width: 500px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      padding: 8px 16px;
+      border-radius: 8px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .header h2 { margin: 0; font-size: 1.1rem; color: var(--accent); }
+    
+    .com-selector {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .com-status {
+      font-size: 0.85rem;
+      color: var(--muted);
+      background: #0f172a;
+      padding: 6px 12px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+    .com-status.connected {
+      color: #22c55e;
+      border-color: #22c55e;
+    }
 
-        h1 {
-            text-align: center;
-            font-size: 24px;
-            margin-bottom: 30px;
-            color: #00d4ff;
-            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
-        }
+    .btn-connect {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-connect:hover { background: #0369a1; }
+    .btn-connect.disconnect {
+      background: #dc2626;
+    }
+    .btn-connect.disconnect:hover {
+      background: #b91c1c;
+    }
 
-        .status-container {
-            display: flex;
-            justify-content: space-around;
-            margin-bottom: 40px;
-            gap: 20px;
-        }
+    .main-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+    }
 
-        .status-item {
-            flex: 1;
-            text-align: center;
-            padding: 20px 15px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+    }
 
-        .status-item .label {
-            font-size: 14px;
-            color: #aaa;
-            margin-bottom: 10px;
-            display: block;
-        }
+    .card {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .card h3 { margin: 0 0 8px 0; font-size: 0.9rem; border-bottom: 1px solid #334155; padding-bottom: 4px; }
 
-        .led {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            margin: 0 auto 10px;
-            transition: all 0.3s ease;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            position: relative;
-        }
+    .led-container {
+      display: flex;
+      justify-content: space-around;
+      background: #0f172a;
+      padding: 8px;
+      border-radius: 6px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .led {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #334155;
+      margin: 0 auto 3px auto;
+      transition: all 0.2s;
+    }
+    .led.green.active { background: #22c55e; box-shadow: 0 0 10px #22c55e; }
+    .led.yellow.active { background: #eab308; box-shadow: 0 0 10px #eab308; }
+    .led.red.active { background: #ef4444; box-shadow: 0 0 10px #ef4444; }
+    .led-container small { font-size: 0.65rem; color: var(--muted); }
 
-        .led.online {
-            background: #00ff88;
-            box-shadow: 0 0 30px #00ff88, inset 0 0 20px rgba(0, 255, 136, 0.3);
-            border-color: #00ff88;
-        }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #283548;
+      padding: 4px 0;
+      font-size: 0.8rem;
+    }
+    .metric val { font-weight: bold; color: var(--accent); }
 
-        .led.offline {
-            background: #ff4444;
-            box-shadow: 0 0 30px #ff4444, inset 0 0 20px rgba(255, 68, 68, 0.3);
-            border-color: #ff4444;
-        }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .form-group { margin-bottom: 4px; }
+    .form-group label { display: block; font-size: 0.7rem; color: var(--muted); }
+    .form-group input {
+      width: 100%;
+      padding: 4px 6px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #fff;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
 
-        .led.unknown {
-            background: #666;
-            box-shadow: none;
-            border-color: #666;
-        }
+    .chart-card {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .chart-box {
+      flex: 1;
+      position: relative;
+      min-height: 0;
+    }
 
-        .status-text {
-            font-size: 12px;
-            color: #888;
-        }
+    /* Controle do Relé */
+    .rele-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+      padding: 10px 0;
+    }
 
-        .status-text.online {
-            color: #00ff88;
-        }
+    .rele-btn {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(145deg, #1a3a5c, #0a1a2e);
+      color: white;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3),
+                  inset 0 2px 4px rgba(255, 255, 255, 0.1);
+      position: relative;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
 
-        .status-text.offline {
-            color: #ff4444;
-        }
+    .rele-btn:active {
+      transform: scale(0.92);
+    }
 
-        .status-text.unknown {
-            color: #888;
-        }
+    .rele-btn .led-indicator {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+      background: #333;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+    }
 
-        .button-container {
-            display: flex;
-            justify-content: center;
-            margin: 30px 0;
-        }
+    .rele-btn .led-indicator.on {
+      background: #ff6b35;
+      box-shadow: 0 0 40px #ff6b35, inset 0 0 20px rgba(255, 107, 53, 0.3);
+    }
 
-        .control-btn {
-            width: 180px;
-            height: 180px;
-            border-radius: 50%;
-            border: none;
-            background: linear-gradient(145deg, #1a3a5c, #0a1a2e);
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3),
-                        inset 0 2px 4px rgba(255, 255, 255, 0.1);
-            position: relative;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+    .rele-btn .led-indicator.off {
+      background: #333;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+    }
 
-        .control-btn:active {
-            transform: scale(0.92);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4),
-                        inset 0 2px 4px rgba(255, 255, 255, 0.05);
-        }
+    .rele-status {
+      font-size: 12px;
+      color: #666;
+    }
 
-        .control-btn .led-indicator {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            margin: 10px auto;
-            transition: all 0.3s ease;
-            background: #333;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
-        }
+    .rele-status.on {
+      color: #ff6b35;
+    }
 
-        .control-btn .led-indicator.on {
-            background: #ff6b35;
-            box-shadow: 0 0 40px #ff6b35, inset 0 0 20px rgba(255, 107, 53, 0.3);
-        }
+    .rele-status.off {
+      color: #666;
+    }
 
-        .control-btn .led-indicator.off {
-            background: #333;
-            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
-        }
+    .status-leds {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      margin-top: 10px;
+    }
 
-        .control-btn .btn-label {
-            font-size: 14px;
-            color: #aaa;
-            margin-top: 5px;
-        }
+    .status-led-item {
+      text-align: center;
+    }
 
-        .control-btn .btn-status {
-            font-size: 12px;
-            color: #666;
-            margin-top: 3px;
-        }
+    .status-led-item .mini-led {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      margin: 0 auto 3px;
+      transition: all 0.3s;
+      background: #334155;
+    }
 
-        .info-bar {
-            display: flex;
-            justify-content: space-between;
-            padding: 15px 0;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            margin-top: 10px;
-            font-size: 12px;
-            color: #666;
-        }
+    .status-led-item .mini-led.online {
+      background: #22c55e;
+      box-shadow: 0 0 15px #22c55e;
+    }
 
-        .info-bar .status-dot {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 5px;
-        }
+    .status-led-item .mini-led.offline {
+      background: #ef4444;
+      box-shadow: 0 0 15px #ef4444;
+    }
 
-        .info-bar .status-dot.green {
-            background: #00ff88;
-        }
+    .status-led-item small {
+      font-size: 0.6rem;
+      color: var(--muted);
+    }
 
-        .info-bar .status-dot.red {
-            background: #ff4444;
-        }
-
-        .info-bar .status-dot.yellow {
-            background: #ffaa00;
-        }
-
-        #mqttStatus {
-            display: flex;
-            align-items: center;
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 20px;
-            }
-
-            .status-container {
-                flex-direction: row;
-                gap: 10px;
-            }
-
-            .status-item {
-                padding: 15px 10px;
-            }
-
-            .led {
-                width: 50px;
-                height: 50px;
-            }
-
-            .control-btn {
-                width: 150px;
-                height: 150px;
-                font-size: 16px;
-            }
-
-            .control-btn .led-indicator {
-                width: 35px;
-                height: 35px;
-            }
-        }
-    </style>
+    @media (max-width: 1024px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+      }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎛️ Controle do Relé</h1>
 
-        <!-- Status de Conexão -->
-        <div class="status-container">
-            <div class="status-item">
-                <span class="label">📡 Página Web</span>
-                <div class="led unknown" id="pageLed"></div>
-                <span class="status-text unknown" id="pageStatus">Carregando...</span>
-            </div>
-            <div class="status-item">
-                <span class="label">🔌 ESP32</span>
-                <div class="led unknown" id="espLed"></div>
-                <span class="status-text unknown" id="espStatus">Desconectado</span>
-            </div>
-        </div>
-
-        <!-- Botão de Controle -->
-        <div class="button-container">
-            <button class="control-btn" id="controlBtn">
-                <div class="led-indicator off" id="relayIndicator"></div>
-                <div class="btn-label">💡 RELÉ</div>
-                <div class="btn-status" id="relayStatus">DESLIGADO</div>
-            </button>
-        </div>
-
-        <!-- Informações -->
-        <div class="info-bar">
-            <span id="mqttStatus">
-                <span class="status-dot yellow" id="mqttDot"></span>
-                MQTT: <span id="mqttText">Conectando...</span>
-            </span>
-            <span id="lastUpdate">Atualizado: agora</span>
-        </div>
+  <div class="app-wrapper">
+    <div class="header">
+      <h2>EVA RADAR RF - Painel de Controle</h2>
+      <div class="com-selector">
+        <span id="comStatus" class="com-status">Porta COM: Não selecionada</span>
+        <button id="btnConnect" class="btn-connect" onclick="conectarSerial()">Selecionar Porta COM</button>
+        <button id="btnDisconnect" class="btn-connect disconnect" onclick="desconectarSerial()" style="display:none;">Desconectar</button>
+      </div>
     </div>
 
-    <script>
-        // ==================== CONFIGURAÇÃO ====================
-        const MQTT_BROKER = 'broker.emqx.io';
-        const MQTT_PORT = 8083; // WebSocket port
-        const DEVICE_ID = 'esp32_rele_casa';
-        const TOPIC_STATUS = 'casa/rele/status';
-        const TOPIC_CMD = 'casa/rele/cmd';
+    <div class="main-grid">
+      <!-- Painel Esquerdo -->
+      <div class="sidebar">
+        <div class="card">
+          <h3>Status & LEDs Físicos</h3>
+          <div class="led-container">
+            <div><div id="ledGreen" class="led green"></div><small>AUSENTE</small></div>
+            <div><div id="ledYellow" class="led yellow"></div><small>SUSPEITA</small></div>
+            <div><div id="ledRed" class="led red"></div><small>PRESENÇA</small></div>
+          </div>
 
-        // ==================== ESTADO ====================
-        let relayState = false;
-        let isConnected = false;
-        let isPressing = false;
+          <div class="metric"><span>RSSI Filtrado:</span><val id="valRssi">0 dBm</val></div>
+          <div class="metric"><span>Referência:</span><val id="valRef">0 dBm</val></div>
+          <div class="metric"><span>Delta:</span><val id="valDelta">0 dB</val></div>
+          <div class="metric"><span>Estado:</span><val id="valEstado">OFFLINE</val></div>
+        </div>
 
-        // ==================== ELEMENTOS DOM ====================
-        const pageLed = document.getElementById('pageLed');
-        const pageStatus = document.getElementById('pageStatus');
-        const espLed = document.getElementById('espLed');
-        const espStatus = document.getElementById('espStatus');
-        const controlBtn = document.getElementById('controlBtn');
-        const relayIndicator = document.getElementById('relayIndicator');
-        const relayStatus = document.getElementById('relayStatus');
-        const mqttDot = document.getElementById('mqttDot');
-        const mqttText = document.getElementById('mqttText');
-        const lastUpdate = document.getElementById('lastUpdate');
+        <div class="card">
+          <h3>Parâmetros de Ajuste</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Limiar Ent. (dBm):</label>
+              <input type="number" step="0.1" id="cfgEntrada" value="3.5">
+            </div>
+            <div class="form-group">
+              <label>Limiar Saída (dBm):</label>
+              <input type="number" step="0.1" id="cfgSaida" value="1.8">
+            </div>
+            <div class="form-group">
+              <label>Tam. Filtro:</label>
+              <input type="number" id="cfgFiltro" value="6">
+            </div>
+            <div class="form-group">
+              <label>Tempo Conf. (ms):</label>
+              <input type="number" id="cfgTempoPresenca" value="200">
+            </div>
+          </div>
+        </div>
+      </div>
 
-        // ==================== MQTT CLIENT ====================
-        const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, `web_${Math.random().toString(16).substr(2, 8)}`);
+      <!-- Gráfico -->
+      <div class="card chart-card">
+        <h3>Sinal RF em Tempo Real</h3>
+        <div class="chart-box">
+          <canvas id="chartRssi"></canvas>
+        </div>
+      </div>
 
-        // ==================== FUNÇÕES UI ====================
-        function updatePageConnection(status) {
-            if (status === 'online') {
-                pageLed.className = 'led online';
-                pageStatus.textContent = 'Online';
-                pageStatus.className = 'status-text online';
-            } else {
-                pageLed.className = 'led offline';
-                pageStatus.textContent = 'Offline';
-                pageStatus.className = 'status-text offline';
-            }
+      <!-- Painel Direito - Controle do Relé -->
+      <div class="sidebar">
+        <div class="card">
+          <h3>🎛️ Controle do Relé</h3>
+          
+          <!-- LEDs de Status de Conexão -->
+          <div class="status-leds">
+            <div class="status-led-item">
+              <div class="mini-led online" id="pageLed"></div>
+              <small>Página Web</small>
+            </div>
+            <div class="status-led-item">
+              <div class="mini-led offline" id="espLed"></div>
+              <small>ESP32</small>
+            </div>
+          </div>
+
+          <!-- Botão do Relé -->
+          <div class="rele-container">
+            <button class="rele-btn" id="controlBtn">
+              <div class="led-indicator off" id="relayIndicator"></div>
+              <div class="rele-status off" id="relayStatus">DESLIGADO</div>
+            </button>
+            <small style="color: var(--muted); font-size: 0.7rem;">Pressione e solte para alternar</small>
+          </div>
+
+          <div class="metric">
+            <span>Comando:</span>
+            <val id="cmdStatus">Aguardando</val>
+          </div>
+          <div class="metric">
+            <span>Último comando:</span>
+            <val id="lastCmd">-</val>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== INICIALIZAÇÃO DO GRÁFICO ====================
+    const ctx = document.getElementById('chartRssi').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'RSSI Filtrado (dBm)', borderColor: '#38bdf8', data: [], tension: 0.2, pointRadius: 2 },
+          { label: 'Referência (dBm)', borderColor: '#eab308', borderDash: [4, 4], data: [], pointRadius: 0 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#f8fafc', boxWidth: 12, font: { size: 11 } } }
+        },
+        scales: {
+          x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#1e293b' } },
+          y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } }
+        }
+      }
+    });
+
+    // ==================== VARIÁVEIS GLOBAIS ====================
+    let port = null;
+    let reader = null;
+    let writer = null;
+    let isConnected = false;
+
+    let bufferRssi = [];
+    let amostrasCalib = [];
+    let referenciaRssi = -67.0;
+    let estadoAtual = "CALIBRANDO";
+    let inicioSuspeita = 0;
+
+    let isPressing = false;
+    let relayState = false;
+
+    // ==================== ELEMENTOS DOM ====================
+    const comStatus = document.getElementById('comStatus');
+    const btnConnect = document.getElementById('btnConnect');
+    const btnDisconnect = document.getElementById('btnDisconnect');
+    
+    const pageLed = document.getElementById('pageLed');
+    const espLed = document.getElementById('espLed');
+    const controlBtn = document.getElementById('controlBtn');
+    const relayIndicator = document.getElementById('relayIndicator');
+    const relayStatus = document.getElementById('relayStatus');
+    const cmdStatus = document.getElementById('cmdStatus');
+    const lastCmd = document.getElementById('lastCmd');
+
+    // ==================== FUNÇÕES DE CONEXÃO SERIAL ====================
+    async function conectarSerial() {
+      try {
+        // Verifica suporte ao Web Serial
+        if (!("serial" in navigator)) {
+          alert("Navegador incompatível. Use o Google Chrome ou Microsoft Edge.");
+          return;
         }
 
-        function updateESPConnection(status) {
-            if (status === 'online') {
-                espLed.className = 'led online';
-                espStatus.textContent = 'Online';
-                espStatus.className = 'status-text online';
-            } else {
-                espLed.className = 'led offline';
-                espStatus.textContent = 'Offline';
-                espStatus.className = 'status-text offline';
+        // Solicita porta
+        port = await navigator.serial.requestPort();
+        
+        // Abre a porta
+        await port.open({ baudRate: 115200 });
+        
+        // Configura UI
+        comStatus.textContent = `Conectado (${port.getInfo().usbProductId || 'COM'})`;
+        comStatus.className = 'com-status connected';
+        btnConnect.style.display = 'none';
+        btnDisconnect.style.display = 'inline-block';
+        
+        // Atualiza LED da página
+        pageLed.className = 'mini-led online';
+        
+        // Atualiza LED do ESP (aguardando dados)
+        espLed.className = 'mini-led offline';
+        
+        isConnected = true;
+
+        // Inicia leitura
+        iniciarLeitura();
+
+      } catch (err) {
+        if (err.name !== 'NotFoundError' && err.name !== 'AbortError') {
+          console.error('Erro ao conectar:', err);
+          alert('Erro ao conectar: ' + err.message);
+        }
+      }
+    }
+
+    async function desconectarSerial() {
+      try {
+        if (reader) {
+          await reader.cancel();
+          reader = null;
+        }
+        if (writer) {
+          await writer.close();
+          writer = null;
+        }
+        if (port) {
+          await port.close();
+          port = null;
+        }
+        
+        isConnected = false;
+        comStatus.textContent = 'Porta COM: Desconectado';
+        comStatus.className = 'com-status';
+        btnConnect.style.display = 'inline-block';
+        btnDisconnect.style.display = 'none';
+        pageLed.className = 'mini-led offline';
+        espLed.className = 'mini-led offline';
+        
+        console.log('Desconectado da porta serial');
+      } catch (err) {
+        console.error('Erro ao desconectar:', err);
+      }
+    }
+
+    // ==================== FUNÇÕES DE COMUNICAÇÃO ====================
+    async function enviarComando(comando) {
+      if (!isConnected || !port) {
+        console.warn('Porta não conectada');
+        return;
+      }
+
+      try {
+        if (!writer) {
+          writer = port.writable.getWriter();
+        }
+        const encoder = new TextEncoder();
+        await writer.write(encoder.encode(comando + "\n"));
+        console.log('Comando enviado:', comando);
+      } catch (err) {
+        console.error('Erro ao enviar comando:', err);
+        // Tenta reconectar o writer
+        writer = null;
+      }
+    }
+
+    async function iniciarLeitura() {
+      try {
+        const textDecoder = new TextDecoderStream();
+        const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+        reader = textDecoder.readable.getReader();
+
+        let bufferTexto = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) {
+            console.log('Leitura finalizada');
+            break;
+          }
+
+          bufferTexto += value;
+          let linhas = bufferTexto.split("\n");
+          bufferTexto = linhas.pop();
+
+          for (let linha of linhas) {
+            linha = linha.trim();
+            if (linha.startsWith("RSSI:")) {
+              let rssiBruto = parseInt(linha.split(":")[1]);
+              if (!isNaN(rssiBruto)) {
+                processarAlgoritmo(rssiBruto);
+                // ESP está online pois está enviando dados
+                espLed.className = 'mini-led online';
+              }
             }
+          }
+        }
+      } catch (err) {
+        console.error('Erro na leitura serial:', err);
+        if (isConnected) {
+          espLed.className = 'mini-led offline';
+        }
+      }
+    }
+
+    // ==================== PROCESSAMENTO DOS DADOS ====================
+    function processarAlgoritmo(rssi) {
+      let limiarEntrada = parseFloat(document.getElementById('cfgEntrada').value) || 3.5;
+      let limiarSaida = parseFloat(document.getElementById('cfgSaida').value) || 1.8;
+      let tamanhoFiltro = parseInt(document.getElementById('cfgFiltro').value) || 6;
+      let tempoConfirmPresenca = parseInt(document.getElementById('cfgTempoPresenca').value) || 200;
+
+      // Filtro
+      bufferRssi.push(rssi);
+      if (bufferRssi.length > tamanhoFiltro) bufferRssi.shift();
+      let rssiFiltrado = bufferRssi.reduce((a, b) => a + b, 0) / bufferRssi.length;
+
+      // Algoritmo de detecção
+      if (estadoAtual === "CALIBRANDO") {
+        amostrasCalib.push(rssiFiltrado);
+        
+        if (amostrasCalib.length >= 50) {
+          referenciaRssi = amostrasCalib.reduce((a, b) => a + b, 0) / amostrasCalib.length;
+          estadoAtual = "AUSENTE";
+          enviarComando("LED:VERDE");
+        }
+      } else {
+        let delta = Math.abs(rssiFiltrado - referenciaRssi);
+
+        if (estadoAtual === "AUSENTE") {
+          if (delta >= limiarEntrada) {
+            estadoAtual = "SUSPEITA";
+            inicioSuspeita = Date.now();
+            enviarComando("LED:AMARELO");
+          }
+        } 
+        else if (estadoAtual === "SUSPEITA") {
+          if (delta >= limiarEntrada) {
+            if (Date.now() - inicioSuspeita >= tempoConfirmPresenca) {
+              estadoAtual = "PRESENCA";
+              enviarComando("LED:VERMELHO");
+            }
+          } else {
+            estadoAtual = "AUSENTE";
+            enviarComando("LED:VERDE");
+          }
+        } 
+        else if (estadoAtual === "PRESENCA") {
+          if (delta <= limiarSaida) {
+            estadoAtual = "AUSENTE";
+            enviarComando("LED:VERDE");
+          }
         }
 
-        function updateRelay(state) {
-            relayState = state;
-            if (state) {
-                relayIndicator.className = 'led-indicator on';
-                relayStatus.textContent = 'LIGADO';
-                relayStatus.style.color = '#ff6b35';
-            } else {
-                relayIndicator.className = 'led-indicator off';
-                relayStatus.textContent = 'DESLIGADO';
-                relayStatus.style.color = '#666';
-            }
-            lastUpdate.textContent = `Atualizado: ${new Date().toLocaleTimeString()}`;
-        }
+        document.getElementById('valDelta').innerText = delta.toFixed(2) + " dB";
+      }
 
-        function updateMQTTStatus(status, text) {
-            if (status === 'connected') {
-                mqttDot.className = 'status-dot green';
-                mqttText.textContent = text || 'Conectado';
-                updateESPConnection('online');
-            } else if (status === 'connecting') {
-                mqttDot.className = 'status-dot yellow';
-                mqttText.textContent = text || 'Conectando...';
-                updateESPConnection('unknown');
-            } else {
-                mqttDot.className = 'status-dot red';
-                mqttText.textContent = text || 'Desconectado';
-                updateESPConnection('offline');
-            }
-        }
+      // Atualiza UI
+      document.getElementById('valRssi').innerText = rssiFiltrado.toFixed(2) + " dBm";
+      document.getElementById('valRef').innerText = referenciaRssi.toFixed(2) + " dBm";
+      document.getElementById('valEstado').innerText = estadoAtual;
 
-        function sendCommand(cmd) {
-            if (!isConnected) {
-                console.warn('MQTT não conectado');
-                return;
-            }
+      document.getElementById('ledGreen').className = 'led green' + (estadoAtual === 'AUSENTE' ? ' active' : '');
+      document.getElementById('ledYellow').className = 'led yellow' + (estadoAtual === 'CALIBRANDO' || estadoAtual === 'SUSPEITA' ? ' active' : '');
+      document.getElementById('ledRed').className = 'led red' + (estadoAtual === 'PRESENCA' ? ' active' : '');
 
-            const message = new Paho.MQTT.Message(cmd);
-            message.destinationName = TOPIC_CMD;
-            message.retained = true;
-            client.send(message);
-            console.log(`Comando enviado: ${cmd}`);
-        }
+      // Atualiza gráfico
+      let agora = new Date().toLocaleTimeString();
+      if (chart.data.labels.length > 30) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+        chart.data.datasets[1].data.shift();
+      }
+      chart.data.labels.push(agora);
+      chart.data.datasets[0].data.push(parseFloat(rssiFiltrado.toFixed(2)));
+      chart.data.datasets[1].data.push(parseFloat(referenciaRssi.toFixed(2)));
+      chart.update('none');
+    }
 
-        // ==================== EVENTOS DO BOTÃO ====================
-        controlBtn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            isPressing = true;
-        });
+    // ==================== CONTROLE DO RELÉ ====================
+    // Evento: Pressionar botão
+    controlBtn.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      isPressing = true;
+      cmdStatus.textContent = 'Pressionado...';
+    });
 
-        controlBtn.addEventListener('mouseup', (e) => {
-            e.preventDefault();
-            if (isPressing) {
-                isPressing = false;
-                // Envia toggle apenas ao soltar
-                sendCommand('toggle');
-            }
-        });
+    controlBtn.addEventListener('mouseup', (e) => {
+      e.preventDefault();
+      if (isPressing) {
+        isPressing = false;
+        toggleRelay();
+      }
+    });
 
-        controlBtn.addEventListener('mouseleave', () => {
-            // Se o mouse sair do botão enquanto pressionado, cancela
-            if (isPressing) {
-                isPressing = false;
-            }
-        });
+    controlBtn.addEventListener('mouseleave', () => {
+      if (isPressing) {
+        isPressing = false;
+        cmdStatus.textContent = 'Cancelado';
+      }
+    });
 
-        // ==================== EVENTOS TOUCH (mobile) ====================
-        controlBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            isPressing = true;
-        });
+    // Eventos Touch (Mobile)
+    controlBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      isPressing = true;
+      cmdStatus.textContent = 'Pressionado...';
+    });
 
-        controlBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            if (isPressing) {
-                isPressing = false;
-                sendCommand('toggle');
-            }
-        });
+    controlBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      if (isPressing) {
+        isPressing = false;
+        toggleRelay();
+      }
+    });
 
-        controlBtn.addEventListener('touchcancel', () => {
-            isPressing = false;
-        });
+    controlBtn.addEventListener('touchcancel', () => {
+      isPressing = false;
+      cmdStatus.textContent = 'Cancelado';
+    });
 
-        // ==================== MQTT CALLBACKS ====================
-        client.onConnectionLost = (responseObject) => {
-            if (responseObject.errorCode !== 0) {
-                console.log('Conexão perdida:', responseObject.errorMessage);
-                isConnected = false;
-                updateMQTTStatus('disconnected', 'Desconectado');
-                updateESPConnection('offline');
-            }
-        };
+    function toggleRelay() {
+      relayState = !relayState;
+      
+      // Atualiza UI
+      if (relayState) {
+        relayIndicator.className = 'led-indicator on';
+        relayStatus.textContent = 'LIGADO';
+        relayStatus.className = 'rele-status on';
+        cmdStatus.textContent = 'Comando: LIGAR';
+        lastCmd.textContent = 'LIGAR';
+      } else {
+        relayIndicator.className = 'led-indicator off';
+        relayStatus.textContent = 'DESLIGADO';
+        relayStatus.className = 'rele-status off';
+        cmdStatus.textContent = 'Comando: DESLIGAR';
+        lastCmd.textContent = 'DESLIGAR';
+      }
 
-        client.onMessageArrived = (message) => {
-            console.log(`Mensagem recebida [${message.destinationName}]: ${message.payloadString}`);
-            
-            if (message.destinationName === TOPIC_STATUS) {
-                const payload = message.payloadString.toLowerCase().trim();
-                if (payload === 'on') {
-                    updateRelay(true);
-                } else if (payload === 'off') {
-                    updateRelay(false);
-                }
-                // Atualiza que o ESP está online ao receber mensagem
-                updateESPConnection('online');
-            }
-        };
+      // Envia comando via Serial
+      const comando = relayState ? 'RELE:ON' : 'RELE:OFF';
+      enviarComando(comando);
+    }
 
-        // ==================== CONECTAR MQTT ====================
-        function connectMQTT() {
-            updateMQTTStatus('connecting', 'Conectando...');
-            updatePageConnection('online');
+    // ==================== INICIALIZAÇÃO ====================
+    console.log('Painel EVA RADAR RF iniciado');
+    console.log('Web Serial API suportada:', 'serial' in navigator);
 
-            const connectOptions = {
-                onSuccess: () => {
-                    console.log('Conectado ao MQTT broker');
-                    isConnected = true;
-                    updateMQTTStatus('connected', 'Conectado');
-                    updateESPConnection('online');
-                    
-                    // Inscreve no tópico de status
-                    client.subscribe(TOPIC_STATUS);
-                    console.log(`Inscrito em: ${TOPIC_STATUS}`);
-                    
-                    // Solicita o estado atual
-                    // O ESP32 publica automaticamente ao conectar
-                },
-                onFailure: (error) => {
-                    console.error('Falha na conexão MQTT:', error);
-                    isConnected = false;
-                    updateMQTTStatus('disconnected', 'Falha na conexão');
-                    updateESPConnection('offline');
-                    
-                    // Tenta reconectar após 5 segundos
-                    setTimeout(connectMQTT, 5000);
-                },
-                timeout: 10,
-                keepAliveInterval: 30,
-                mqttVersion: 4
-            };
+    // LED da página começa online (página carregada)
+    pageLed.className = 'mini-led online';
 
-            client.connect(connectOptions);
-        }
+    // Limpa o gráfico inicialmente
+    for (let i = 0; i < 30; i++) {
+      chart.data.labels.push('');
+      chart.data.datasets[0].data.push(null);
+      chart.data.datasets[1].data.push(null);
+    }
+    chart.update();
 
-        // ==================== INICIAR ====================
-        function init() {
-            // Atualiza página como online
-            updatePageConnection('online');
-            
-            // Conecta ao MQTT
-            connectMQTT();
-
-            // Atualiza relógio
-            setInterval(() => {
-                if (!isConnected) {
-                    updateESPConnection('offline');
-                }
-            }, 5000);
-        }
-
-        // Inicia quando a página carregar
-        init();
-
-        console.log('Página de controle do relé iniciada!');
-        console.log(`Device ID: ${DEVICE_ID}`);
-        console.log(`Tópico status: ${TOPIC_STATUS}`);
-        console.log(`Tópico comando: ${TOPIC_CMD}`);
-
-        // Cleanup ao fechar a página
-        window.addEventListener('beforeunload', () => {
-            if (client && isConnected) {
-                client.disconnect();
-            }
-        });
-    </script>
-
-    <!-- Biblioteca Paho MQTT -->
-    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js">
-    </script>
+    // Fecha conexão ao fechar a página
+    window.addEventListener('beforeunload', () => {
+      if (isConnected) {
+        desconectarSerial();
+      }
+    });
+  </script>
 </body>
 </html>
