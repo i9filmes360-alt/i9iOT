@@ -1,303 +1,577 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>EVA RADAR RF - Dashboard MQTT</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LabVIEW Style · Relay Control</title>
+  
+  <!-- ============================================================
+       BIBLIOTECAS EXTERNAS
+       ============================================================ -->
+  <!-- MQTT: Cliente para comunicação com o broker -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Font Awesome: Ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
   <style>
-    :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --green: #22c55e;
-      --yellow: #eab308;
-      --red: #ef4444;
-      --shadow: 0 10px 25px -5px rgba(0,0,0,0.4);
-    }
+    /* ================================================================
+       FONTES
+       ================================================================ */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap');
+
+    /* ================================================================
+       RESET - Remove margens e padding padrão do navegador
+       ================================================================ */
     * {
       margin: 0;
       padding: 0;
       box-sizing: border-box;
-      -webkit-tap-highlight-color: transparent;
     }
+
+    /* ================================================================
+       CORPO DA PÁGINA (BACKGROUND)
+       - Fundo escuro com gradiente para destacar o painel
+       ================================================================ */
     body {
-      min-height: 100vh;
-      background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 80%);
-      color: var(--text);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
+      background: #0b1219;                    /* Cor sólida de fallback */
+      background: radial-gradient(ellipse at 30% 40%, #050505, #070e14); /* Gradiente escuro */
+      min-height: 100vh;                     /* Altura mínima = 100% da tela */
+      display: flex;                         /* Centraliza o conteúdo */
       align-items: center;
+      justify-content: center;
+      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+      padding: 20px;                         /* Espaçamento nas bordas */
     }
-    .container {
-      width: 100%;
-      max-width: 900px;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    header {
-      background: var(--card);
-      padding: 12px 16px;
-      border-radius: 16px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border: 1px solid rgba(255,255,255,0.05);
-    }
-    h1 { font-size: 1.1rem; color: var(--accent); font-weight: 700; }
-    
-    .status-badge {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.75rem;
-      color: var(--muted);
-      background: #0f172a;
-      padding: 6px 12px;
-      border-radius: 20px;
-    }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #334155; }
-    .dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
 
-    .grid-main {
+    /* ================================================================
+       PAINEL PRINCIPAL (CARD)
+       - Estilo "front panel" do LabVIEW com cores claras
+       ================================================================ */
+    .lv-panel {
+      background: #eaf1f9;                   /* Cor sólida de fallback */
+      background: linear-gradient(165deg, #f0f6fc, #d8e6f2); /* Gradiente claro */
+      border-radius: 28px;                   /* Bordas arredondadas */
+      padding: 28px 26px 26px;               /* Espaçamento interno */
+      max-width: 420px;                      /* Largura máxima */
+      width: 100%;                           /* Largura responsiva */
+      
+      /* Sombras para efeito 3D */
+      box-shadow: 
+        0 16px 40px rgba(0, 20, 40, 0.4),   /* Sombra externa */
+        inset 0 2px 0 rgba(255,255,255,0.7), /* Brilho interno superior */
+        inset 0 -4px 8px rgba(0,0,0,0.08);   /* Sombra interna inferior */
+      
+      border: 1px solid #b8cfe0;             /* Borda */
+      border-top-color: #d6e8f5;             /* Borda superior mais clara */
+      transition: all 0.2s;                  /* Transição suave */
+    }
+
+    /* ================================================================
+       CABEÇALHO
+       ================================================================ */
+    .lv-header {
+      display: flex;                         /* Alinha itens em linha */
+      align-items: center;
+      justify-content: space-between;        /* Espaço entre título e badge */
+      margin-bottom: 22px;                   /* Espaço inferior */
+      padding-bottom: 10px;                  /* Espaço interno inferior */
+      border-bottom: 2px solid #b0c8dc;      /* Linha divisória */
+    }
+
+    .lv-header h2 {
+      font-weight: 600;                      /* Peso da fonte */
+      font-size: 1.1rem;                     /* Tamanho da fonte */
+      letter-spacing: 0.02em;                /* Espaçamento entre letras */
+      color: #1a4a6b;                        /* Cor do texto */
+      text-shadow: 0 1px 0 rgba(255,255,255,0.5); /* Sombra do texto */
+      display: flex;
+      align-items: center;
+      gap: 10px;                             /* Espaço entre ícone e texto */
+    }
+
+    .lv-header h2 i {
+      color: #1a6b9e;                        /* Cor do ícone */
+      font-size: 1.2rem;                     /* Tamanho do ícone */
+    }
+
+    /* Badge (etiqueta) do cabeçalho */
+    .lv-badge {
+      background: #d4e4f0;                   /* Fundo */
+      padding: 4px 14px 4px 12px;            /* Espaçamento interno */
+      border-radius: 30px;                   /* Bordas arredondadas */
+      font-size: 0.6rem;                     /* Tamanho da fonte */
+      font-weight: 600;                      /* Peso da fonte */
+      color: #1a5276;                        /* Cor do texto */
+      border: 1px solid #a8c0d4;             /* Borda */
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.6);
+      letter-spacing: 0.04em;                /* Espaçamento entre letras */
+    }
+
+    .lv-badge i {
+      margin-right: 6px;                     /* Espaço entre ícone e texto */
+      color: #1a6b9e;
+    }
+
+    /* ================================================================
+       GRID DE STATUS (LEDs)
+       - 2 colunas: Web e ESP32
+       ================================================================ */
+    .lv-status-grid {
       display: grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-    }
-    @media (min-width: 768px) {
-      .grid-main { grid-template-columns: 300px 1fr; }
+      grid-template-columns: 1fr 1fr;        /* 2 colunas iguais */
+      gap: 12px;                             /* Espaço entre os itens */
+      margin-bottom: 24px;                   /* Espaço inferior */
     }
 
-    .card {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 16px;
-      box-shadow: var(--shadow);
-      border: 1px solid rgba(255,255,255,0.05);
-    }
-    .card h2 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
-
-    .leds {
+    /* Cada item do status */
+    .lv-status-item {
+      background: #dce8f2;
+      background: linear-gradient(180deg, #e6f0f8, #d0dce8);
+      border-radius: 14px;
+      padding: 12px 6px;                     /* Espaçamento interno */
+      border: 1px solid #b6cada;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.7);
       display: flex;
-      justify-content: space-around;
-      background: #0f172a;
-      padding: 10px;
-      border-radius: 12px;
-      margin-bottom: 12px;
+      flex-direction: column;                /* Empilha verticalmente */
+      align-items: center;
+      gap: 6px;                              /* Espaço entre label e LED */
     }
-    .led-box { text-align: center; font-size: 0.65rem; color: var(--muted); }
-    .led {
-      width: 18px;
-      height: 18px;
+
+    .lv-status-item .label {
+      font-size: 0.6rem;
+      font-weight: 600;
+      text-transform: uppercase;             /* Tudo maiúsculo */
+      letter-spacing: 0.06em;
+      color: #2a5f7a;
+    }
+
+    /* ================================================================
+       LEDS DE STATUS
+       - Estados: on (verde/azul), off (vermelho), wait (cinza)
+       ================================================================ */
+    .lv-led {
+      width: 20px;                           /* Largura */
+      height: 20px;                          /* Altura (quadrado perfeito) */
+      border-radius: 50%;                    /* Círculo perfeito */
+      background: #b8ccdc;                   /* Cor padrão (desligado) */
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.15), 0 0 0 1px #a0b8cc;
+      transition: 0.15s;                     /* Transição suave ao mudar estado */
+    }
+
+    .lv-led.on {                             /* LED ligado (azul) */
+      background: #4fc3f7;
+      background: radial-gradient(circle at 35% 35%, #a0e0ff, #1a8bc0);
+      box-shadow: 0 0 16px #4fc3f7, inset 0 -2px 4px rgba(0,0,0,0.15);
+    }
+
+    .lv-led.off {                            /* LED com erro/desligado (vermelho) */
+      background: #e06060;
+      background: radial-gradient(circle at 35% 35%, #ff8a8a, #b83030);
+      box-shadow: 0 0 14px #e06060, inset 0 -2px 4px rgba(0,0,0,0.2);
+    }
+
+    .lv-led.wait {                           /* LED aguardando (cinza) */
+      background: #c0c8d0;
+      background: radial-gradient(circle at 35% 35%, #e0e8f0, #a0b0c0);
+      box-shadow: 0 0 8px #b0c0d0;
+    }
+
+    /* ================================================================
+       ESTADO CENTRAL (BADGE DE TEXTO)
+       ================================================================ */
+    .lv-estado-box {
+      background: #dce8f2;
+      background: linear-gradient(180deg, #e6f0f8, #d0dce8);
+      border-radius: 40px;
+      padding: 6px 20px;
+      margin-bottom: 24px;
+      display: inline-block;
+      border: 1px solid #b0c8dc;
+      box-shadow: inset 0 2px 5px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.6);
+      width: auto;                           /* Ajusta ao conteúdo */
+      margin-left: auto;                     /* Centraliza horizontalmente */
+      margin-right: auto;
+    }
+
+    .lv-estado {
+      font-weight: 600;
+      font-size: 0.8rem;
+      letter-spacing: 0.06em;
+      color: #1a4a6b;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 10px;                             /* Espaço entre indicador e texto */
+    }
+
+    .lv-estado .indicator {                  /* Círculo indicador */
+      display: inline-block;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
-      background: #334155;
-      margin: 0 auto 4px;
-      transition: all 0.3s;
+      background: #b0c8dc;                   /* Padrão: cinza */
+      transition: 0.2s;
+      box-shadow: inset 0 1px 4px rgba(0,0,0,0.1);
     }
-    .led.green.active { background: var(--green); box-shadow: 0 0 12px var(--green); }
-    .led.yellow.active { background: var(--yellow); box-shadow: 0 0 12px var(--yellow); }
-    .led.red.active { background: var(--red); box-shadow: 0 0 12px var(--red); }
 
-    .metric {
+    .lv-estado .indicator.on {               /* Estado ligado (azul) */
+      background: #4fc3f7;
+      background: radial-gradient(circle at 35% 35%, #80d8ff, #1a8bc0);
+      box-shadow: 0 0 14px #4fc3f7;
+    }
+
+    .lv-estado .indicator.off {              /* Estado desligado (vermelho) */
+      background: #e06060;
+      background: radial-gradient(circle at 35% 35%, #ff8a8a, #b83030);
+      box-shadow: 0 0 14px #e06060;
+    }
+
+    /* ================================================================
+       BOTÃO PRINCIPAL
+       - Estilo "booleano" redondo do LabVIEW
+       ================================================================ */
+    .lv-btn-wrapper {
       display: flex;
-      justify-content: space-between;
-      padding: 6px 0;
-      border-bottom: 1px solid rgba(255,255,255,0.05);
-      font-size: 0.85rem;
+      justify-content: center;               /* Centraliza o botão */
+      margin-bottom: 22px;
     }
-    .metric span:last-child { font-weight: 700; color: var(--accent); }
 
-    .form-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-top: 8px;
+    .lv-btn {
+      width: 120px;                          /* Largura */
+      height: 120px;                         /* Altura (quadrado perfeito) */
+      border-radius: 50%;                    /* Círculo perfeito */
+      
+      /* Estado neutro (desabilitado) */
+      background: #d0dce8;
+      background: radial-gradient(circle at 40% 35%, #eaf2f8, #b8ccdc);
+      border: 2px solid #a8bcc8;
+      
+      /* Sombra para efeito 3D */
+      box-shadow: 
+        0 6px 0 #8aa0b0,                    /* Sombra inferior para efeito de profundidade */
+        0 10px 24px rgba(0, 20, 40, 0.25),
+        inset 0 -6px 6px rgba(0,0,0,0.08),  /* Sombra interna inferior */
+        inset 0 6px 8px rgba(255,255,255,0.7); /* Brilho interno superior */
+      
+      color: #3a6a8a;                        /* Cor do ícone */
+      font-size: 2.4rem;                     /* Tamanho do ícone */
+      cursor: pointer;                       /* Cursor de mão */
+      transition: all 0.06s ease;            /* Transição rápida */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      outline: none;                         /* Remove outline do foco */
+      user-select: none;                     /* Impede seleção do texto */
     }
-    .form-group label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 2px; }
-    .form-group input {
-      width: 100%;
-      padding: 6px;
-      background: #0f172a;
-      border: 1px solid #334155;
-      border-radius: 6px;
-      color: #fff;
-      font-size: 0.8rem;
-    }
-    
-    .btn {
-      width: 100%;
-      background: var(--accent);
-      color: #000;
-      border: none;
-      padding: 8px;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-      margin-top: 10px;
-      font-size: 0.8rem;
-    }
-    .btn:active { opacity: 0.8; }
 
-    .chart-card { min-height: 320px; display: flex; flex-direction: column; }
-    .chart-box { flex: 1; position: relative; width: 100%; height: 100%; }
+    .lv-btn:active {                         /* Efeito ao clicar */
+      transform: translateY(4px);            /* Desce um pouco */
+      box-shadow: 0 2px 0 #8aa0b0, 0 8px 20px rgba(0, 20, 40, 0.2);
+    }
 
-    footer {
-      text-align: center;
+    .lv-btn:disabled {                       /* Estado desabilitado */
+      opacity: 0.4;
+      transform: translateY(4px);
+      box-shadow: 0 2px 0 #8aa0b0;
+      pointer-events: none;                  /* Impede clique */
+      filter: grayscale(0.4);                /* Tonalidade cinza */
+    }
+
+    .lv-btn.on {                             /* Estado LIGADO (azul) */
+      background: radial-gradient(circle at 40% 35%, #80d8ff, #1a8bc0);
+      border-color: #4fc3f7;
+      color: #ffffff;
+      box-shadow: 
+        0 6px 0 #0f5a7a,
+        0 0 40px #4fc3f7,                   /* Brilho externo */
+        inset 0 -6px 8px rgba(0,0,0,0.2),
+        inset 0 6px 12px rgba(255,255,255,0.4);
+    }
+
+    .lv-btn.off {                            /* Estado DESLIGADO (vermelho) */
+      background: radial-gradient(circle at 40% 35%, #ff8a8a, #b83030);
+      border-color: #e06060;
+      color: #ffffff;
+      box-shadow: 
+        0 6px 0 #7a2a2a,
+        0 0 30px #e06060,                   /* Brilho externo */
+        inset 0 -6px 8px rgba(0,0,0,0.2),
+        inset 0 6px 12px rgba(255,255,255,0.25);
+    }
+
+    .lv-btn i {
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); /* Sombra no ícone */
+    }
+
+    /* ================================================================
+       RODAPÉ (FOOTER)
+       - Informações técnicas do sistema
+       ================================================================ */
+    .lv-footer {
+      background: #dce8f2;
+      background: linear-gradient(180deg, #e6f0f8, #d0dce8);
+      border-radius: 16px;
+      padding: 14px 16px;
+      border: 1px solid #b0c8dc;
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.6);
+      font-size: 0.65rem;
+      display: flex;
+      flex-direction: column;                /* Empilha as linhas */
+      gap: 6px;                              /* Espaço entre linhas */
+      color: #1a4a6b;
+    }
+
+    .lv-footer .row {
+      display: flex;
+      justify-content: space-between;        /* Label à esquerda, código à direita */
+      align-items: center;
+    }
+
+    .lv-footer .row span:first-child {
+      color: #2a5f7a;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    .lv-footer .row code {
+      font-family: 'Inter', monospace;
+      background: #c8d8e8;
+      padding: 2px 12px;
+      border-radius: 30px;
+      color: #0a3a5a;
+      border: 1px solid #a8bcc8;
       font-size: 0.7rem;
-      color: var(--muted);
-      margin-top: 10px;
+      font-weight: 500;
     }
+
+    .lv-footer .row i {
+      margin-right: 6px;
+      color: #1a6b9e;
+    }
+
+    /* ================================================================
+       RESPONSIVIDADE
+       - Ajustes para telas pequenas (celulares)
+       ================================================================ */
+    @media (max-width: 420px) {
+      .lv-panel { padding: 18px 14px; }      /* Reduz padding */
+      .lv-btn { width: 100px; height: 100px; font-size: 2rem; } /* Botão menor */
+    }
+
+    /* ================================================================
+       FIM DO CSS
+       ================================================================ */
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <header>
-      <h1>EVA RADAR RF</h1>
-      <div class="status-badge">
-        <div id="dotWeb" class="dot"></div>
-        <span id="txtWeb">Conectando...</span>
+  <!-- ================================================================
+       PAINEL PRINCIPAL
+       ================================================================ -->
+  <div class="lv-panel">
+
+    <!-- CABEÇALHO -->
+    <div class="lv-header">
+      <h2><i class="fa-regular fa-circle-play"></i> RELAY CTL · FRONT</h2>
+      <div class="lv-badge"><i class="fa-regular fa-circle-check"></i> VI 2.0</div>
+    </div>
+
+    <!-- LEDs DE STATUS (WEB e ESP32) -->
+    <div class="lv-status-grid">
+      <div class="lv-status-item">
+        <span class="label"><i class="fa-regular fa-wifi" style="margin-right: 6px;"></i>WEB → MQTT</span>
+        <div class="lv-led" id="ledPage"></div>
+        <!-- ledPage: controlado pelo JavaScript -->
       </div>
-    </header>
-
-    <div class="grid-main">
-      <!-- Lateral de Indicadores -->
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <div class="card">
-          <h2>Status do Sistema</h2>
-          <div class="leds">
-            <div class="led-box"><div id="ledVerde" class="led green"></div>AUSENTE</div>
-            <div class="led-box"><div id="ledAmarelo" class="led yellow"></div>SUSPEITA</div>
-            <div class="led-box"><div id="ledVermelho" class="led red"></div>PRESENÇA</div>
-          </div>
-
-          <div class="metric"><span>RSSI Atual:</span><span id="valRssi">0 dBm</span></div>
-          <div class="metric"><span>Referência:</span><span id="valRef">0 dBm</span></div>
-          <div class="metric"><span>Delta:</span><span id="valDelta">0 dB</span></div>
-          <div class="metric"><span>Estado:</span><span id="valEstado">OFFLINE</span></div>
-        </div>
-
-        <div class="card">
-          <h2>Ajustes Remotos</h2>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Limiar Ent. (dBm):</label>
-              <input type="number" step="0.1" id="cfgEntrada" value="3.5">
-            </div>
-            <div class="form-group">
-              <label>Limiar Saída (dBm):</label>
-              <input type="number" step="0.1" id="cfgSaida" value="1.8">
-            </div>
-          </div>
-          <button class="btn" onclick="enviarConfiguracao()">Enviar Limiares via MQTT</button>
-        </div>
+      <div class="lv-status-item">
+        <span class="label"><i class="fa-regular fa-microchip" style="margin-right: 6px;"></i>ESP32 → MQTT</span>
+        <div class="lv-led" id="ledEsp"></div>
+        <!-- ledEsp: controlado pelo JavaScript -->
       </div>
+    </div>
 
-      <!-- Gráfico Principal -->
-      <div class="card chart-card">
-        <h2>Sinal RF em Tempo Real</h2>
-        <div class="chart-box">
-          <canvas id="chartRssi"></canvas>
+    <!-- ESTADO CENTRAL -->
+    <div style="display: flex; justify-content: center;">
+      <div class="lv-estado-box">
+        <div class="lv-estado">
+          <span class="indicator" id="estadoIndicator"></span>
+          <!-- estadoIndicator: círculo colorido -->
+          <span id="txtEstado">AGUARDANDO</span>
+          <!-- txtEstado: texto LIGADO/DESLIGADO -->
         </div>
       </div>
     </div>
 
-    <footer>broker.emqx.io • EVA RADAR RF System</footer>
+    <!-- BOTÃO PRINCIPAL -->
+    <div class="lv-btn-wrapper">
+      <button id="btnRele" class="lv-btn off" disabled>
+        <i class="fa-solid fa-power-off"></i>
+      </button>
+      <!-- btnRele: controlado pelo JavaScript -->
+    </div>
+
+    <!-- RODAPÉ COM INFORMAÇÕES -->
+    <div class="lv-footer">
+      <div class="row">
+        <span><i class="fa-regular fa-server"></i> Broker</span>
+        <code>broker.emqx.io</code>
+      </div>
+      <div class="row">
+        <span><i class="fa-regular fa-paper-plane"></i> Cmd</span>
+        <code>casa/rele/cmd</code>
+      </div>
+      <div class="row">
+        <span><i class="fa-regular fa-rotate-right"></i> Status</span>
+        <code>casa/rele/status</code>
+      </div>
+      <div class="row" style="margin-top: 4px; border-top: 1px solid #b0c8dc; padding-top: 8px;">
+        <span><i class="fa-regular fa-clock"></i> client</span>
+        <code style="font-size: 0.6rem;" id="clientIdDisplay">web_rele_xxx</code>
+      </div>
+    </div>
   </div>
 
+  <!-- ================================================================
+       JAVASCRIPT - LÓGICA DE CONEXÃO MQTT E CONTROLE
+       ================================================================ -->
   <script>
-    // Inicialização do Gráfico Chart.js
-    const ctx = document.getElementById('chartRssi').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: 'RSSI Filtrado (dBm)', borderColor: '#38bdf8', data: [], tension: 0.2, pointRadius: 2 },
-          { label: 'Referência (dBm)', borderColor: '#eab308', borderDash: [4, 4], data: [], pointRadius: 0 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f8fafc', boxWidth: 10, font: { size: 10 } } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#1e293b' } },
-          y: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#334155' } }
+    (function() {
+      // ============================================================
+      // CONFIGURAÇÕES MQTT
+      // ============================================================
+      const BROKER       = "wss://broker.emqx.io:8084/mqtt";  // Endereço do broker
+      const TOPIC_STATUS = "casa/rele/status";               // Tópico de status
+      const TOPIC_CMD    = "casa/rele/cmd";                  // Tópico de comando
+      const CLIENT_ID    = "web_rele_" + Math.random().toString(16).substr(2, 6); // ID único
+
+      // ============================================================
+      // VARIÁVEIS DE ESTADO
+      // ============================================================
+      let client = null;           // Cliente MQTT
+      let estado = false;          // Estado atual do relé (false = desligado)
+      let ultimaMsg = 0;           // Timestamp da última mensagem recebida
+      const TIMEOUT = 8000;        // 8 segundos sem mensagem = ESP32 desconectado
+
+      // ============================================================
+      // REFERÊNCIAS DOS ELEMENTOS HTML
+      // ============================================================
+      const ledPage   = document.getElementById("ledPage");
+      const ledEsp    = document.getElementById("ledEsp");
+      const btnRele   = document.getElementById("btnRele");
+      const txtEstado = document.getElementById("txtEstado");
+      const estadoIndicator = document.getElementById("estadoIndicator");
+      const clientIdDisplay = document.getElementById("clientIdDisplay");
+
+      // Exibe o ID do cliente no rodapé
+      clientIdDisplay.textContent = CLIENT_ID;
+
+      // ============================================================
+      // FUNÇÃO: ATUALIZA A INTERFACE
+      // - Muda cores do botão, texto e indicador
+      // ============================================================
+      function atualizarUI() {
+        if (estado) {
+          // Estado LIGADO
+          btnRele.classList.remove("off");
+          btnRele.classList.add("on");
+          txtEstado.textContent = "LIGADO";
+          estadoIndicator.className = "indicator on";
+        } else {
+          // Estado DESLIGADO
+          btnRele.classList.remove("on");
+          btnRele.classList.add("off");
+          txtEstado.textContent = "DESLIGADO";
+          estadoIndicator.className = "indicator off";
         }
       }
-    });
 
-    // Configuração MQTT
-    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "web_radar_" + Math.random().toString(16).substr(2, 8)
-    });
+      // ============================================================
+      // FUNÇÃO: CONECTA AO BROKER MQTT
+      // ============================================================
+      function conectar() {
+        client = mqtt.connect(BROKER, {
+          clientId: CLIENT_ID,
+          clean: true,               // Sessão limpa
+          reconnectPeriod: 3000      // Tenta reconectar a cada 3 segundos
+        });
 
-    const topicData = "casa/radar/data";
-    const topicCmd  = "casa/radar/cmd";
+        // Evento: CONECTADO
+        client.on("connect", () => {
+          ledPage.className = "lv-led on";        // LED Web = verde/azul
+          client.subscribe(TOPIC_STATUS);         // Inscreve no tópico de status
+          btnRele.disabled = false;               // Habilita o botão
+        });
 
-    const dotWeb = document.getElementById('dotWeb');
-    const txtWeb = document.getElementById('txtWeb');
+        // Evento: TENTANDO RECONECTAR
+        client.on("reconnect", () => {
+          ledPage.className = "lv-led wait";      // LED Web = amarelo/cinza
+          btnRele.disabled = true;                // Desabilita o botão
+        });
 
-    client.on("connect", () => {
-      dotWeb.className = "dot online";
-      txtWeb.textContent = "Online";
-      client.subscribe(topicData);
-    });
+        // Evento: CONEXÃO FECHADA
+        client.on("close", () => {
+          ledPage.className = "lv-led off";       // LED Web = vermelho
+          btnRele.disabled = true;                // Desabilita o botão
+        });
 
-    client.on("offline", () => {
-      dotWeb.className = "dot";
-      txtWeb.textContent = "Offline";
-    });
+        // Evento: ERRO
+        client.on("error", (err) => {
+          console.warn("MQTT error:", err);
+          ledPage.className = "lv-led off";
+        });
 
-    // Processa payloads JSON vindo do ESP32
-    client.on("message", (topic, message) => {
-      if (topic === topicData) {
-        try {
-          const data = JSON.parse(message.toString());
-          
-          document.getElementById('valRssi').innerText = data.rssi.toFixed(1) + " dBm";
-          document.getElementById('valRef').innerText  = data.ref.toFixed(1) + " dBm";
-          document.getElementById('valDelta').innerText = data.delta.toFixed(1) + " dB";
-          document.getElementById('valEstado').innerText = data.estado;
+        // Evento: MENSAGEM RECEBIDA
+        client.on("message", (topic, message) => {
+          if (topic === TOPIC_STATUS) {
+            ultimaMsg = Date.now();               // Atualiza timestamp
+            ledEsp.className = "lv-led on";       // LED ESP32 = verde/azul
 
-          // Atualiza LEDs indicativos
-          document.getElementById('ledVerde').className = 'led green' + (data.estado === 'AUSENTE' ? ' active' : '');
-          document.getElementById('ledAmarelo').className = 'led yellow' + (data.estado === 'CALIBRANDO' || data.estado === 'SUSPEITA' ? ' active' : '');
-          document.getElementById('ledVermelho').className = 'led red' + (data.estado === 'PRESENCA' ? ' active' : '');
-
-          // Atualiza Gráfico
-          let hora = new Date().toLocaleTimeString();
-          if (chart.data.labels.length > 25) {
-            chart.data.labels.shift();
-            chart.data.datasets[0].data.shift();
-            chart.data.datasets[1].data.shift();
+            // Converte a mensagem para texto e define o estado
+            const payload = message.toString().toLowerCase().trim();
+            estado = (payload === "on" || payload === "1" || payload === "true");
+            atualizarUI();                        // Atualiza a interface
           }
-          chart.data.labels.push(hora);
-          chart.data.datasets[0].data.push(data.rssi);
-          chart.data.datasets[1].data.push(data.ref);
-          chart.update('none');
-
-        } catch (e) {
-          console.error("Erro ao ler JSON:", e);
-        }
+        });
       }
-    });
 
-    function enviarConfiguracao() {
-      const ent = document.getElementById('cfgEntrada').value;
-      const sai = document.getElementById('cfgSaida').value;
-      const cmd = JSON.stringify({ limiarEntrada: parseFloat(ent), limiarSaida: parseFloat(sai) });
+      // ============================================================
+      // TIMER: VERIFICA SE O ESP32 ESTÁ RESPONDENDO
+      // - Se passar do TIMEOUT, LED ESP32 fica vermelho
+      // ============================================================
+      setInterval(() => {
+        if (Date.now() - ultimaMsg > TIMEOUT) {
+          ledEsp.className = "lv-led off";       // LED ESP32 = vermelho
+        }
+      }, 1200); // Verifica a cada 1.2 segundos
+
+      // ============================================================
+      // EVENTO: CLIQUE NO BOTÃO
+      // - Publica "toggle" no tópico de comando
+      // ============================================================
+      btnRele.addEventListener("click", () => {
+        if (!client || !client.connected) return; // Se desconectado, não faz nada
+        client.publish(TOPIC_CMD, "toggle");      // Envia comando toggle
+      });
+
+      // ============================================================
+      // INICIALIZAÇÃO
+      // ============================================================
+      conectar();                                  // Conecta ao broker
+      estado = false;                              // Estado inicial: desligado
+      atualizarUI();                               // Atualiza interface
+
+      // LED Web começa como "wait" até conectar
+      ledPage.className = "lv-led wait";
       
-      client.publish(topicCmd, cmd);
-      alert("Configurações enviadas via MQTT!");
-    }
+      // Se conectar dentro de 2 segundos, muda para "on"
+      setTimeout(() => {
+        if (ledPage.className === "lv-led wait" && client && client.connected) {
+          ledPage.className = "lv-led on";
+        }
+      }, 2000);
+
+    })(); // Fim da função auto-executável
   </script>
+
 </body>
 </html>
