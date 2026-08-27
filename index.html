@@ -3,18 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Controle Relé ESP32</title>
+  <title>EVA RADAR RF - Dashboard MQTT</title>
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     :root {
       --bg: #0f172a;
       --card: #1e293b;
-      --text: #f1f5f9;
+      --text: #f8fafc;
       --muted: #94a3b8;
-      --accent: #3b82f6;
-      --on: #22c55e;
-      --off: #ef4444;
-      --shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+      --accent: #38bdf8;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --red: #ef4444;
+      --shadow: 0 10px 25px -5px rgba(0,0,0,0.4);
     }
     * {
       margin: 0;
@@ -24,291 +26,278 @@
     }
     body {
       min-height: 100vh;
-      background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 70%);
+      background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 80%);
       color: var(--text);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 12px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 24px;
     }
     .container {
       width: 100%;
-      max-width: 380px;
-      text-align: center;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-      letter-spacing: -0.025em;
+    header {
+      background: var(--card);
+      padding: 12px 16px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid rgba(255,255,255,0.05);
     }
-    .subtitle {
+    h1 { font-size: 1.1rem; color: var(--accent); font-weight: 700; }
+    
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
       color: var(--muted);
-      font-size: 0.9rem;
-      margin-bottom: 24px;
+      background: #0f172a;
+      padding: 6px 12px;
+      border-radius: 20px;
     }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #334155; }
+    .dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    .grid-main {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+    }
+    @media (min-width: 768px) {
+      .grid-main { grid-template-columns: 300px 1fr; }
+    }
+
     .card {
       background: var(--card);
-      border-radius: 24px;
-      padding: 28px 24px;
+      border-radius: 16px;
+      padding: 16px;
       box-shadow: var(--shadow);
       border: 1px solid rgba(255,255,255,0.05);
     }
+    .card h2 { font-size: 0.9rem; color: var(--muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+
     .leds {
       display: flex;
-      justify-content: center;
-      gap: 24px;
-      margin-bottom: 24px;
+      justify-content: space-around;
+      background: #0f172a;
+      padding: 10px;
+      border-radius: 12px;
+      margin-bottom: 12px;
     }
-    .led-item {
-      font-size: 0.7rem;
-      color: var(--muted);
-      text-align: center;
-    }
+    .led-box { text-align: center; font-size: 0.65rem; color: var(--muted); }
     .led {
-      width: 12px;
-      height: 12px;
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
       background: #334155;
       margin: 0 auto 4px;
       transition: all 0.3s;
     }
-    .led.online {
-      background: var(--on);
-      box-shadow: 0 0 10px var(--on);
-    }
-    .status {
+    .led.green.active { background: var(--green); box-shadow: 0 0 12px var(--green); }
+    .led.yellow.active { background: var(--yellow); box-shadow: 0 0 12px var(--yellow); }
+    .led.red.active { background: var(--red); box-shadow: 0 0 12px var(--red); }
+
+    .metric {
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 24px;
-      font-size: 1rem;
-      font-weight: 500;
-    }
-    .status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: var(--muted);
-      transition: background 0.3s, box-shadow 0.3s;
-    }
-    .status-dot.on {
-      background: var(--on);
-      box-shadow: 0 0 12px var(--on);
-    }
-    .status-dot.off {
-      background: var(--off);
-      box-shadow: 0 0 12px var(--off);
-    }
-    .btn-wrapper {
-      position: relative;
-      width: 160px;
-      height: 160px;
-      margin: 0 auto 20px;
-    }
-    .btn {
-      width: 160px;
-      height: 160px;
-      border-radius: 50%;
-      border: none;
-      background: linear-gradient(145deg, #334155, #1e293b);
-      box-shadow:
-        8px 8px 20px #0b1220,
-        -8px -8px 20px #2a3a52,
-        inset 0 0 0 1px rgba(255,255,255,0.05);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s ease;
-      outline: none;
-    }
-    .btn:active {
-      transform: scale(0.94);
-    }
-    .btn.on {
-      background: linear-gradient(145deg, #16a34a, #15803d);
-      box-shadow:
-        8px 8px 20px #0b1220,
-        -8px -8px 20px #2a3a52,
-        0 0 30px rgba(34, 197, 94, 0.4);
-    }
-    .btn svg {
-      width: 48px;
-      height: 48px;
-      fill: #94a3b8;
-      transition: fill 0.3s;
-    }
-    .btn.on svg {
-      fill: #fff;
-    }
-    .btn-label {
-      font-size: 0.95rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      color: var(--muted);
-      transition: color 0.3s;
-      margin-bottom: 8px;
-    }
-    .btn-label.on {
-      color: var(--on);
-    }
-    .feedback {
-      min-height: 22px;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
       font-size: 0.85rem;
-      color: var(--muted);
     }
-    .feedback.error { color: var(--off); }
-    .feedback.ok { color: var(--on); }
+    .metric span:last-child { font-weight: 700; color: var(--accent); }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .form-group label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 2px; }
+    .form-group input {
+      width: 100%;
+      padding: 6px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.8rem;
+    }
+    
+    .btn {
+      width: 100%;
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 8px;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 10px;
+      font-size: 0.8rem;
+    }
+    .btn:active { opacity: 0.8; }
+
+    .chart-card { min-height: 320px; display: flex; flex-direction: column; }
+    .chart-box { flex: 1; position: relative; width: 100%; height: 100%; }
+
     footer {
-      margin-top: 28px;
-      font-size: 0.75rem;
-      color: #64748b;
+      text-align: center;
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
+
   <div class="container">
-    <h1>Controle do Relé</h1>
-    <p class="subtitle">ESP32 • MQTT • Funciona de qualquer lugar</p>
+    <header>
+      <h1>EVA RADAR RF</h1>
+      <div class="status-badge">
+        <div id="dotWeb" class="dot"></div>
+        <span id="txtWeb">Conectando...</span>
+      </div>
+    </header>
 
-    <div class="card">
-      <div class="leds">
-        <div class="led-item">
-          <div id="webLed" class="led"></div>
-          WEB
+    <div class="grid-main">
+      <!-- Lateral de Indicadores -->
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div class="card">
+          <h2>Status do Sistema</h2>
+          <div class="leds">
+            <div class="led-box"><div id="ledVerde" class="led green"></div>AUSENTE</div>
+            <div class="led-box"><div id="ledAmarelo" class="led yellow"></div>SUSPEITA</div>
+            <div class="led-box"><div id="ledVermelho" class="led red"></div>PRESENÇA</div>
+          </div>
+
+          <div class="metric"><span>RSSI Atual:</span><span id="valRssi">0 dBm</span></div>
+          <div class="metric"><span>Referência:</span><span id="valRef">0 dBm</span></div>
+          <div class="metric"><span>Delta:</span><span id="valDelta">0 dB</span></div>
+          <div class="metric"><span>Estado:</span><span id="valEstado">OFFLINE</span></div>
         </div>
-        <div class="led-item">
-          <div id="espLed" class="led"></div>
-          ESP
+
+        <div class="card">
+          <h2>Ajustes Remotos</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Limiar Ent. (dBm):</label>
+              <input type="number" step="0.1" id="cfgEntrada" value="3.5">
+            </div>
+            <div class="form-group">
+              <label>Limiar Saída (dBm):</label>
+              <input type="number" step="0.1" id="cfgSaida" value="1.8">
+            </div>
+          </div>
+          <button class="btn" onclick="enviarConfiguracao()">Enviar Limiares via MQTT</button>
         </div>
       </div>
 
-      <div class="status">
-        <div class="status-dot" id="dot"></div>
-        <span id="statusText">Aguardando...</span>
+      <!-- Gráfico Principal -->
+      <div class="card chart-card">
+        <h2>Sinal RF em Tempo Real</h2>
+        <div class="chart-box">
+          <canvas id="chartRssi"></canvas>
+        </div>
       </div>
-
-      <div class="btn-wrapper">
-        <button class="btn" id="toggleBtn" aria-label="Alternar relé">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2a1 1 0 0 1 1 1v8a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1zm5.657 3.343a1 1 0 0 1 0 1.414 7 7 0 1 0-9.9 9.9 1 1 0 1 1-1.414 1.414 9 9 0 1 1 12.728-12.728 1 1 0 0 1-1.414 0z"/>
-          </svg>
-        </button>
-      </div>
-
-      <div class="btn-label" id="btnLabel">TOQUE PARA ALTERNAR</div>
-      <div class="feedback" id="feedback"></div>
     </div>
 
-    <footer>
-      MQTT • broker.emqx.io • Página no GitHub Pages
-    </footer>
+    <footer>broker.emqx.io • EVA RADAR RF System</footer>
   </div>
 
   <script>
-    // ============ MQTT ============
+    // Inicialização do Gráfico Chart.js
+    const ctx = document.getElementById('chartRssi').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'RSSI Filtrado (dBm)', borderColor: '#38bdf8', data: [], tension: 0.2, pointRadius: 2 },
+          { label: 'Referência (dBm)', borderColor: '#eab308', borderDash: [4, 4], data: [], pointRadius: 0 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: '#f8fafc', boxWidth: 10, font: { size: 10 } } } },
+        scales: {
+          x: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#1e293b' } },
+          y: { ticks: { color: '#94a3b8', font: { size: 9 } }, grid: { color: '#334155' } }
+        }
+      }
+    });
+
+    // Configuração MQTT
     const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "web_rele_" + Math.random().toString(16).substr(2, 8)
+      clientId: "web_radar_" + Math.random().toString(16).substr(2, 8)
     });
 
-    const topicStatus = "casa/rele/status";
-    const topicCmd    = "casa/rele/cmd";
+    const topicData = "casa/radar/data";
+    const topicCmd  = "casa/radar/cmd";
 
-    let isOn = false;
-    let busy = false;
-    let espTimeout = null;
+    const dotWeb = document.getElementById('dotWeb');
+    const txtWeb = document.getElementById('txtWeb');
 
-    const toggleBtn  = document.getElementById('toggleBtn');
-    const statusText = document.getElementById('statusText');
-    const btnLabel   = document.getElementById('btnLabel');
-    const feedback   = document.getElementById('feedback');
-    const dot        = document.getElementById('dot');
-    const webLed     = document.getElementById('webLed');
-    const espLed     = document.getElementById('espLed');
-
-    function setFeedback(msg, type = '') {
-      feedback.textContent = msg;
-      feedback.className = 'feedback ' + type;
-    }
-
-    function updateUI(state) {
-      isOn = state;
-      if (state) {
-        toggleBtn.classList.add('on');
-        btnLabel.classList.add('on');
-        btnLabel.textContent = 'RELÉ LIGADO';
-        statusText.textContent = 'Ligado';
-        dot.className = 'status-dot on';
-      } else {
-        toggleBtn.classList.remove('on');
-        btnLabel.classList.remove('on');
-        btnLabel.textContent = 'RELÉ DESLIGADO';
-        statusText.textContent = 'Desligado';
-        dot.className = 'status-dot off';
-      }
-    }
-
-    // Conexão Web
     client.on("connect", () => {
-      webLed.classList.add('online');
-      setFeedback('Conectado ao broker', 'ok');
-      client.subscribe(topicStatus);
+      dotWeb.className = "dot online";
+      txtWeb.textContent = "Online";
+      client.subscribe(topicData);
     });
 
-    client.on("reconnect", () => {
-      webLed.classList.remove('online');
-      setFeedback('Reconectando...', '');
+    client.on("offline", () => {
+      dotWeb.className = "dot";
+      txtWeb.textContent = "Offline";
     });
 
-    client.on("error", (err) => {
-      console.error(err);
-      setFeedback('Erro de conexão MQTT', 'error');
-    });
-
-    // Mensagens do ESP
+    // Processa payloads JSON vindo do ESP32
     client.on("message", (topic, message) => {
-      const msg = message.toString().toLowerCase().trim();
+      if (topic === topicData) {
+        try {
+          const data = JSON.parse(message.toString());
+          
+          document.getElementById('valRssi').innerText = data.rssi.toFixed(1) + " dBm";
+          document.getElementById('valRef').innerText  = data.ref.toFixed(1) + " dBm";
+          document.getElementById('valDelta').innerText = data.delta.toFixed(1) + " dB";
+          document.getElementById('valEstado').innerText = data.estado;
 
-      // Marca que o ESP está online
-      espLed.classList.add('online');
-      clearTimeout(espTimeout);
-      espTimeout = setTimeout(() => {
-        espLed.classList.remove('online');
-        statusText.textContent = 'ESP Offline';
-        dot.className = 'status-dot';
-      }, 8000); // se não receber nada em 8s considera offline
+          // Atualiza LEDs indicativos
+          document.getElementById('ledVerde').className = 'led green' + (data.estado === 'AUSENTE' ? ' active' : '');
+          document.getElementById('ledAmarelo').className = 'led yellow' + (data.estado === 'CALIBRANDO' || data.estado === 'SUSPEITA' ? ' active' : '');
+          document.getElementById('ledVermelho').className = 'led red' + (data.estado === 'PRESENCA' ? ' active' : '');
 
-      if (topic === topicStatus) {
-        updateUI(msg === "on" || msg === "1");
-        setFeedback('Estado atualizado', 'ok');
+          // Atualiza Gráfico
+          let hora = new Date().toLocaleTimeString();
+          if (chart.data.labels.length > 25) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+            chart.data.datasets[1].data.shift();
+          }
+          chart.data.labels.push(hora);
+          chart.data.datasets[0].data.push(data.rssi);
+          chart.data.datasets[1].data.push(data.ref);
+          chart.update('none');
+
+        } catch (e) {
+          console.error("Erro ao ler JSON:", e);
+        }
       }
     });
 
-    // Botão de toggle
-    toggleBtn.addEventListener('click', () => {
-      if (busy) return;
-      if (!client.connected) {
-        setFeedback('Web offline', 'error');
-        return;
-      }
-
-      busy = true;
-      setFeedback('Enviando comando...');
-
-      client.publish(topicCmd, "toggle");
-
-      setTimeout(() => {
-        busy = false;
-        setFeedback('Comando enviado!', 'ok');
-      }, 600);
-    });
-
-    // Estado inicial
-    setFeedback('Conectando...', '');
+    function enviarConfiguracao() {
+      const ent = document.getElementById('cfgEntrada').value;
+      const sai = document.getElementById('cfgSaida').value;
+      const cmd = JSON.stringify({ limiarEntrada: parseFloat(ent), limiarSaida: parseFloat(sai) });
+      
+      client.publish(topicCmd, cmd);
+      alert("Configurações enviadas via MQTT!");
+    }
   </script>
 </body>
 </html>
