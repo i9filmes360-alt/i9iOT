@@ -1,277 +1,510 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>EVA RADAR RF - Dashboard MQTT</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    :root {
-      --bg: #0f172a;
-      --card: #1e293b;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --green: #22c55e;
-      --yellow: #eab308;
-      --red: #ef4444;
-      --shadow: 0 4px 12px rgba(0,0,0,0.3);
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    
-    html, body {
-      width: 100%;
-      height: 100vh;
-      height: 100dvh; /* Garante tamanho exato sem barra de navegação do celular */
-      overflow: hidden; /* Força zero rolagem */
-      background: radial-gradient(ellipse at top, #1e293b 0%, var(--bg) 80%);
-      color: var(--text);
-      font-family: system-ui, -apple-system, sans-serif;
-      padding: 8px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle do Relé</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    .container {
-      width: 100%;
-      height: 100%;
-      max-width: 900px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
 
-    header {
-      background: var(--card);
-      padding: 6px 12px;
-      border-radius: 10px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      border: 1px solid rgba(255,255,255,0.05);
-      flex-shrink: 0;
-    }
-    h1 { font-size: 0.95rem; color: var(--accent); font-weight: 700; }
-    
-    .status-badge {
-      display: flex; align-items: center; gap: 6px; font-size: 0.7rem; color: var(--muted);
-      background: #0f172a; padding: 4px 8px; border-radius: 12px;
-    }
-    .dot { width: 7px; height: 7px; border-radius: 50%; background: #334155; }
-    .dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 30px;
+            padding: 40px;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-    .grid-main {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      min-height: 0; /* Previne overflow do flex */
-    }
+        h1 {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #00d4ff;
+            text-shadow: 0 0 20px rgba(0, 212, 255, 0.3);
+        }
 
-    @media (min-width: 768px) {
-      .grid-main { display: grid; grid-template-columns: 300px 1fr; }
-    }
+        .status-container {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 40px;
+            gap: 20px;
+        }
 
-    .card {
-      background: var(--card);
-      border-radius: 12px;
-      padding: 10px;
-      box-shadow: var(--shadow);
-      border: 1px solid rgba(255,255,255,0.05);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .card h2 { font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .status-item {
+            flex: 1;
+            text-align: center;
+            padding: 20px 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
 
-    .leds { display: flex; justify-content: space-around; background: #0f172a; padding: 6px; border-radius: 8px; margin-bottom: 6px; }
-    .led-box { text-align: center; font-size: 0.6rem; color: var(--muted); font-weight: bold; }
-    .led { width: 14px; height: 14px; border-radius: 50%; background: #334155; margin: 0 auto 2px; transition: all 0.3s; }
-    .led.green.active { background: var(--green); box-shadow: 0 0 10px var(--green); }
-    .led.yellow.active { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
-    .led.red.active { background: var(--red); box-shadow: 0 0 10px var(--red); }
+        .status-item .label {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 10px;
+            display: block;
+        }
 
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 12px;
-    }
-    .metric { display: flex; justify-content: space-between; padding: 2px 0; font-size: 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.03); }
-    .metric span:last-child { font-weight: 700; color: var(--accent); }
+        .led {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            position: relative;
+        }
 
-    .controls-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
-    .form-group { margin-bottom: 0; }
-    .form-group.full { grid-column: span 2; }
-    .form-group label { display: block; font-size: 0.65rem; color: var(--muted); margin-bottom: 2px; }
-    .form-group select, .form-group input {
-      width: 100%; padding: 5px 8px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #fff; font-size: 0.75rem;
-    }
-    
-    .btn {
-      grid-column: span 2;
-      width: 100%; background: var(--accent); color: #000; border: none; padding: 8px;
-      border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.75rem; margin-top: 2px;
-    }
-    .btn:active { opacity: 0.8; }
+        .led.online {
+            background: #00ff88;
+            box-shadow: 0 0 30px #00ff88, inset 0 0 20px rgba(0, 255, 136, 0.3);
+            border-color: #00ff88;
+        }
 
-    .chart-card { flex: 1; min-height: 0; justify-content: flex-start; }
-    .chart-box { flex: 1; position: relative; width: 100%; height: 100%; min-height: 0; }
-  </style>
+        .led.offline {
+            background: #ff4444;
+            box-shadow: 0 0 30px #ff4444, inset 0 0 20px rgba(255, 68, 68, 0.3);
+            border-color: #ff4444;
+        }
+
+        .led.unknown {
+            background: #666;
+            box-shadow: none;
+            border-color: #666;
+        }
+
+        .status-text {
+            font-size: 12px;
+            color: #888;
+        }
+
+        .status-text.online {
+            color: #00ff88;
+        }
+
+        .status-text.offline {
+            color: #ff4444;
+        }
+
+        .status-text.unknown {
+            color: #888;
+        }
+
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        .control-btn {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(145deg, #1a3a5c, #0a1a2e);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3),
+                        inset 0 2px 4px rgba(255, 255, 255, 0.1);
+            position: relative;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .control-btn:active {
+            transform: scale(0.92);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4),
+                        inset 0 2px 4px rgba(255, 255, 255, 0.05);
+        }
+
+        .control-btn .led-indicator {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 10px auto;
+            transition: all 0.3s ease;
+            background: #333;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .control-btn .led-indicator.on {
+            background: #ff6b35;
+            box-shadow: 0 0 40px #ff6b35, inset 0 0 20px rgba(255, 107, 53, 0.3);
+        }
+
+        .control-btn .led-indicator.off {
+            background: #333;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .control-btn .btn-label {
+            font-size: 14px;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        .control-btn .btn-status {
+            font-size: 12px;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .info-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .info-bar .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+
+        .info-bar .status-dot.green {
+            background: #00ff88;
+        }
+
+        .info-bar .status-dot.red {
+            background: #ff4444;
+        }
+
+        .info-bar .status-dot.yellow {
+            background: #ffaa00;
+        }
+
+        #mqttStatus {
+            display: flex;
+            align-items: center;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+            }
+
+            .status-container {
+                flex-direction: row;
+                gap: 10px;
+            }
+
+            .status-item {
+                padding: 15px 10px;
+            }
+
+            .led {
+                width: 50px;
+                height: 50px;
+            }
+
+            .control-btn {
+                width: 150px;
+                height: 150px;
+                font-size: 16px;
+            }
+
+            .control-btn .led-indicator {
+                width: 35px;
+                height: 35px;
+            }
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <h1>🎛️ Controle do Relé</h1>
 
-  <div class="container">
-    <header>
-      <h1>EVA RADAR RF</h1>
-      <div class="status-badge">
-        <div id="dotWeb" class="dot"></div>
-        <span id="txtWeb">Conectando...</span>
-      </div>
-    </header>
-
-    <div class="grid-main">
-      <div style="display: flex; flex-direction: column; gap: 8px;">
-        <!-- Status Card -->
-        <div class="card">
-          <h2>Status do Sistema</h2>
-          <div class="leds">
-            <div class="led-box"><div id="ledVerde" class="led green"></div>AUSENTE</div>
-            <div class="led-box"><div id="ledAmarelo" class="led yellow"></div>SUSPEITA</div>
-            <div class="led-box"><div id="ledVermelho" class="led red"></div>PRESENÇA</div>
-          </div>
-
-          <div class="metrics-grid">
-            <div class="metric"><span>Fonte:</span><span id="valModo">--</span></div>
-            <div class="metric"><span>Estado:</span><span id="valEstado">OFFLINE</span></div>
-            <div class="metric"><span>RSSI:</span><span id="valRssi">0 dBm</span></div>
-            <div class="metric"><span>Delta:</span><span id="valDelta">0 dB</span></div>
-            <div class="metric" style="grid-column: span 2;"><span>Referência:</span><span id="valRef">0 dBm</span></div>
-          </div>
+        <!-- Status de Conexão -->
+        <div class="status-container">
+            <div class="status-item">
+                <span class="label">📡 Página Web</span>
+                <div class="led unknown" id="pageLed"></div>
+                <span class="status-text unknown" id="pageStatus">Carregando...</span>
+            </div>
+            <div class="status-item">
+                <span class="label">🔌 ESP32</span>
+                <div class="led unknown" id="espLed"></div>
+                <span class="status-text unknown" id="espStatus">Desconectado</span>
+            </div>
         </div>
 
-        <!-- Ajustes Card -->
-        <div class="card">
-          <h2>Ajustes Remotos</h2>
-          <div class="controls-grid">
-            <div class="form-group full">
-              <label>Fonte de Sinal RSSI:</label>
-              <select id="cfgFonteSinal">
-                <option value="TX">ESP32 TX (Pacotes UDP)</option>
-                <option value="WIFI">Wi-Fi Local (Roteador)</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label>Limiar Ent. (dBm):</label>
-              <input type="number" step="0.1" id="cfgEntrada" value="3.5">
-            </div>
-            
-            <div class="form-group">
-              <label>Limiar Saída (dBm):</label>
-              <input type="number" step="0.1" id="cfgSaida" value="1.8">
-            </div>
-
-            <button class="btn" onclick="enviarConfiguracao()">Aplicar Configuração</button>
-          </div>
+        <!-- Botão de Controle -->
+        <div class="button-container">
+            <button class="control-btn" id="controlBtn">
+                <div class="led-indicator off" id="relayIndicator"></div>
+                <div class="btn-label">💡 RELÉ</div>
+                <div class="btn-status" id="relayStatus">DESLIGADO</div>
+            </button>
         </div>
-      </div>
 
-      <!-- Gráfico Card -->
-      <div class="card chart-card">
-        <h2>Sinal RF em Tempo Real</h2>
-        <div class="chart-box">
-          <canvas id="chartRssi"></canvas>
+        <!-- Informações -->
+        <div class="info-bar">
+            <span id="mqttStatus">
+                <span class="status-dot yellow" id="mqttDot"></span>
+                MQTT: <span id="mqttText">Conectando...</span>
+            </span>
+            <span id="lastUpdate">Atualizado: agora</span>
         </div>
-      </div>
     </div>
-  </div>
 
-  <script>
-    const ctx = document.getElementById('chartRssi').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: 'RSSI (dBm)', borderColor: '#38bdf8', data: [], tension: 0.2, pointRadius: 1 },
-          { label: 'Ref (dBm)', borderColor: '#eab308', borderDash: [3, 3], data: [], pointRadius: 0 }
-        ]
-      },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: '#f8fafc', boxWidth: 8, font: { size: 9 } } } },
-        scales: {
-          x: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { color: '#1e293b' } },
-          y: { ticks: { color: '#94a3b8', font: { size: 8 } }, grid: { color: '#334155' } }
+    <script>
+        // ==================== CONFIGURAÇÃO ====================
+        const MQTT_BROKER = 'broker.emqx.io';
+        const MQTT_PORT = 8083; // WebSocket port
+        const DEVICE_ID = 'esp32_rele_casa';
+        const TOPIC_STATUS = 'casa/rele/status';
+        const TOPIC_CMD = 'casa/rele/cmd';
+
+        // ==================== ESTADO ====================
+        let relayState = false;
+        let isConnected = false;
+        let isPressing = false;
+
+        // ==================== ELEMENTOS DOM ====================
+        const pageLed = document.getElementById('pageLed');
+        const pageStatus = document.getElementById('pageStatus');
+        const espLed = document.getElementById('espLed');
+        const espStatus = document.getElementById('espStatus');
+        const controlBtn = document.getElementById('controlBtn');
+        const relayIndicator = document.getElementById('relayIndicator');
+        const relayStatus = document.getElementById('relayStatus');
+        const mqttDot = document.getElementById('mqttDot');
+        const mqttText = document.getElementById('mqttText');
+        const lastUpdate = document.getElementById('lastUpdate');
+
+        // ==================== MQTT CLIENT ====================
+        const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, `web_${Math.random().toString(16).substr(2, 8)}`);
+
+        // ==================== FUNÇÕES UI ====================
+        function updatePageConnection(status) {
+            if (status === 'online') {
+                pageLed.className = 'led online';
+                pageStatus.textContent = 'Online';
+                pageStatus.className = 'status-text online';
+            } else {
+                pageLed.className = 'led offline';
+                pageStatus.textContent = 'Offline';
+                pageStatus.className = 'status-text offline';
+            }
         }
-      }
-    });
 
-    const client = mqtt.connect("wss://broker.emqx.io:8084/mqtt", {
-      clientId: "web_radar_" + Math.random().toString(16).substr(2, 8)
-    });
-
-    const topicData = "casa/radar/data";
-    const topicCmd  = "casa/radar/cmd";
-
-    client.on("connect", () => {
-      document.getElementById('dotWeb').className = "dot online";
-      document.getElementById('txtWeb').textContent = "Online";
-      client.subscribe(topicData);
-      client.subscribe(topicCmd);
-    });
-
-    client.on("message", (topic, message) => {
-      try {
-        const data = JSON.parse(message.toString());
-        
-        if (topic === topicData) {
-          document.getElementById('valModo').innerText  = data.fonte || "TX";
-          document.getElementById('valRssi').innerText  = data.rssi.toFixed(1);
-          document.getElementById('valRef').innerText   = data.ref.toFixed(1);
-          document.getElementById('valDelta').innerText = data.delta.toFixed(1);
-          document.getElementById('valEstado').innerText= data.estado;
-
-          document.getElementById('ledVerde').className = 'led green' + (data.estado === 'AUSENTE' ? ' active' : '');
-          document.getElementById('ledAmarelo').className = 'led yellow' + (data.estado === 'CALIBRANDO' || data.estado === 'SUSPEITA' ? ' active' : '');
-          document.getElementById('ledVermelho').className = 'led red' + (data.estado === 'PRESENCA' ? ' active' : '');
-
-          let hora = new Date().toLocaleTimeString();
-          if (chart.data.labels.length > 20) {
-            chart.data.labels.shift();
-            chart.data.datasets[0].data.shift();
-            chart.data.datasets[1].data.shift();
-          }
-          chart.data.labels.push(hora);
-          chart.data.datasets[0].data.push(data.rssi);
-          chart.data.datasets[1].data.push(data.ref);
-          chart.update('none');
-        } 
-        else if (topic === topicCmd) {
-          if (data.fonte !== undefined) document.getElementById('cfgFonteSinal').value = data.fonte;
-          if (data.limiarEntrada !== undefined) document.getElementById('cfgEntrada').value = data.limiarEntrada;
-          if (data.limiarSaida !== undefined) document.getElementById('cfgSaida').value = data.limiarSaida;
+        function updateESPConnection(status) {
+            if (status === 'online') {
+                espLed.className = 'led online';
+                espStatus.textContent = 'Online';
+                espStatus.className = 'status-text online';
+            } else {
+                espLed.className = 'led offline';
+                espStatus.textContent = 'Offline';
+                espStatus.className = 'status-text offline';
+            }
         }
-      } catch (e) { console.error(e); }
-    });
 
-    function enviarConfiguracao() {
-      const fonte = document.getElementById('cfgFonteSinal').value;
-      const ent   = parseFloat(document.getElementById('cfgEntrada').value);
-      const sai   = parseFloat(document.getElementById('cfgSaida').value);
-      
-      const cmd = JSON.stringify({
-        fonte: fonte,
-        limiarEntrada: ent,
-        limiarSaida: sai
-      });
-      
-      client.publish(topicCmd, cmd);
-    }
-  </script>
+        function updateRelay(state) {
+            relayState = state;
+            if (state) {
+                relayIndicator.className = 'led-indicator on';
+                relayStatus.textContent = 'LIGADO';
+                relayStatus.style.color = '#ff6b35';
+            } else {
+                relayIndicator.className = 'led-indicator off';
+                relayStatus.textContent = 'DESLIGADO';
+                relayStatus.style.color = '#666';
+            }
+            lastUpdate.textContent = `Atualizado: ${new Date().toLocaleTimeString()}`;
+        }
+
+        function updateMQTTStatus(status, text) {
+            if (status === 'connected') {
+                mqttDot.className = 'status-dot green';
+                mqttText.textContent = text || 'Conectado';
+                updateESPConnection('online');
+            } else if (status === 'connecting') {
+                mqttDot.className = 'status-dot yellow';
+                mqttText.textContent = text || 'Conectando...';
+                updateESPConnection('unknown');
+            } else {
+                mqttDot.className = 'status-dot red';
+                mqttText.textContent = text || 'Desconectado';
+                updateESPConnection('offline');
+            }
+        }
+
+        function sendCommand(cmd) {
+            if (!isConnected) {
+                console.warn('MQTT não conectado');
+                return;
+            }
+
+            const message = new Paho.MQTT.Message(cmd);
+            message.destinationName = TOPIC_CMD;
+            message.retained = true;
+            client.send(message);
+            console.log(`Comando enviado: ${cmd}`);
+        }
+
+        // ==================== EVENTOS DO BOTÃO ====================
+        controlBtn.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            isPressing = true;
+        });
+
+        controlBtn.addEventListener('mouseup', (e) => {
+            e.preventDefault();
+            if (isPressing) {
+                isPressing = false;
+                // Envia toggle apenas ao soltar
+                sendCommand('toggle');
+            }
+        });
+
+        controlBtn.addEventListener('mouseleave', () => {
+            // Se o mouse sair do botão enquanto pressionado, cancela
+            if (isPressing) {
+                isPressing = false;
+            }
+        });
+
+        // ==================== EVENTOS TOUCH (mobile) ====================
+        controlBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isPressing = true;
+        });
+
+        controlBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            if (isPressing) {
+                isPressing = false;
+                sendCommand('toggle');
+            }
+        });
+
+        controlBtn.addEventListener('touchcancel', () => {
+            isPressing = false;
+        });
+
+        // ==================== MQTT CALLBACKS ====================
+        client.onConnectionLost = (responseObject) => {
+            if (responseObject.errorCode !== 0) {
+                console.log('Conexão perdida:', responseObject.errorMessage);
+                isConnected = false;
+                updateMQTTStatus('disconnected', 'Desconectado');
+                updateESPConnection('offline');
+            }
+        };
+
+        client.onMessageArrived = (message) => {
+            console.log(`Mensagem recebida [${message.destinationName}]: ${message.payloadString}`);
+            
+            if (message.destinationName === TOPIC_STATUS) {
+                const payload = message.payloadString.toLowerCase().trim();
+                if (payload === 'on') {
+                    updateRelay(true);
+                } else if (payload === 'off') {
+                    updateRelay(false);
+                }
+                // Atualiza que o ESP está online ao receber mensagem
+                updateESPConnection('online');
+            }
+        };
+
+        // ==================== CONECTAR MQTT ====================
+        function connectMQTT() {
+            updateMQTTStatus('connecting', 'Conectando...');
+            updatePageConnection('online');
+
+            const connectOptions = {
+                onSuccess: () => {
+                    console.log('Conectado ao MQTT broker');
+                    isConnected = true;
+                    updateMQTTStatus('connected', 'Conectado');
+                    updateESPConnection('online');
+                    
+                    // Inscreve no tópico de status
+                    client.subscribe(TOPIC_STATUS);
+                    console.log(`Inscrito em: ${TOPIC_STATUS}`);
+                    
+                    // Solicita o estado atual
+                    // O ESP32 publica automaticamente ao conectar
+                },
+                onFailure: (error) => {
+                    console.error('Falha na conexão MQTT:', error);
+                    isConnected = false;
+                    updateMQTTStatus('disconnected', 'Falha na conexão');
+                    updateESPConnection('offline');
+                    
+                    // Tenta reconectar após 5 segundos
+                    setTimeout(connectMQTT, 5000);
+                },
+                timeout: 10,
+                keepAliveInterval: 30,
+                mqttVersion: 4
+            };
+
+            client.connect(connectOptions);
+        }
+
+        // ==================== INICIAR ====================
+        function init() {
+            // Atualiza página como online
+            updatePageConnection('online');
+            
+            // Conecta ao MQTT
+            connectMQTT();
+
+            // Atualiza relógio
+            setInterval(() => {
+                if (!isConnected) {
+                    updateESPConnection('offline');
+                }
+            }, 5000);
+        }
+
+        // Inicia quando a página carregar
+        init();
+
+        console.log('Página de controle do relé iniciada!');
+        console.log(`Device ID: ${DEVICE_ID}`);
+        console.log(`Tópico status: ${TOPIC_STATUS}`);
+        console.log(`Tópico comando: ${TOPIC_CMD}`);
+
+        // Cleanup ao fechar a página
+        window.addEventListener('beforeunload', () => {
+            if (client && isConnected) {
+                client.disconnect();
+            }
+        });
+    </script>
+
+    <!-- Biblioteca Paho MQTT -->
+    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js">
+    </script>
 </body>
 </html>
