@@ -1,751 +1,367 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle do Radar - MQTT</title>
-    <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle Relé | Smart Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f172a, #1e1b4b);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
-        }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #090d16;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
+      color: #f1f5f9;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
 
-        .container {
-            background: rgba(30, 41, 59, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 24px;
-            padding: 40px;
-            width: 100%;
-            max-width: 500px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
+    .card {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 28px;
+      padding: 36px 28px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
 
-        h1 {
-            text-align: center;
-            color: #38bdf8;
-            font-size: 24px;
-            margin-bottom: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
+    /* Borda superior iluminada */
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.5), transparent);
+    }
 
-        h1 .subtitle {
-            font-size: 14px;
-            color: #94a3b8;
-            font-weight: normal;
-        }
+    .header {
+      margin-bottom: 24px;
+    }
 
-        .status-container {
-            display: flex;
-            justify-content: space-around;
-            gap: 15px;
-            margin-bottom: 30px;
-        }
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #f8fafc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
 
-        .status-item {
-            flex: 1;
-            text-align: center;
-            padding: 15px 10px;
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 12px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
-        }
+    .header h1 i {
+      color: #38bdf8;
+    }
 
-        .status-item .label {
-            display: block;
-            font-size: 11px;
-            color: #94a3b8;
-            margin-bottom: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    /* Redes e Conexões (LEDs) */
+    .status-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
 
-        .led {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            margin: 0 auto 8px;
-            transition: all 0.5s ease;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-            position: relative;
-        }
+    .status-item {
+      background: rgba(30, 41, 59, 0.5);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
 
-        .led.online {
-            background: #22c55e;
-            box-shadow: 0 0 30px #22c55e, inset 0 0 20px rgba(34, 197, 94, 0.3);
-            border-color: #22c55e;
-        }
+    .status-item span {
+      font-size: 0.65rem;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
 
-        .led.offline {
-            background: #ef4444;
-            box-shadow: 0 0 30px #ef4444, inset 0 0 20px rgba(239, 68, 68, 0.3);
-            border-color: #ef4444;
-        }
+    .led-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
 
-        .led.connecting {
-            background: #eab308;
-            box-shadow: 0 0 30px #eab308, inset 0 0 20px rgba(234, 179, 8, 0.3);
-            border-color: #eab308;
-            animation: pulse 1s infinite;
-        }
+    .led {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #334155;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
 
-        .led.unknown {
-            background: #334155;
-            border-color: #475569;
-        }
+    .led.on {
+      background: #10b981;
+      box-shadow: 0 0 12px #10b981, 0 0 24px rgba(16, 185, 129, 0.4);
+    }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-        }
+    .led.off {
+      background: #ef4444;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+    }
 
-        .status-text {
-            font-size: 12px;
-            color: #94a3b8;
-        }
+    /* Mostrador de Estado */
+    .estado-container {
+      margin-bottom: 28px;
+    }
 
-        .status-text.online {
-            color: #22c55e;
-        }
+    .estado-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: rgba(51, 65, 85, 0.4);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s;
+    }
 
-        .status-text.offline {
-            color: #ef4444;
-        }
+    .estado-badge.on {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
 
-        .status-text.connecting {
-            color: #eab308;
-        }
+    .estado-badge.off {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
 
-        .rele-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 20px 0;
-        }
+    /* Botão Principal Cyberpunk */
+    .btn-container {
+      position: relative;
+      width: 140px;
+      height: 140px;
+      margin: 0 auto 28px;
+    }
 
-        .rele-btn {
-            width: 180px;
-            height: 180px;
-            border-radius: 50%;
-            border: none;
-            background: linear-gradient(145deg, #1a2a4a, #0a1525);
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4),
-                        inset 0 2px 4px rgba(255, 255, 255, 0.05);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-            position: relative;
-        }
+    .btn-rele {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      outline: none;
+      background: #1e293b;
+      color: #64748b;
+      font-size: 2rem;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.05), 0 10px 25px rgba(0,0,0,0.5);
+      border: 2px solid rgba(255,255,255,0.05);
+    }
 
-        .rele-btn:active {
-            transform: scale(0.92);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
-        }
+    .btn-rele:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      filter: grayscale(100%);
+    }
 
-        .rele-btn .led-indicator {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            transition: all 0.4s ease;
-            background: #1a2a3a;
-            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
-        }
+    .btn-rele.ligado {
+      background: radial-gradient(circle, #10b981 0%, #047857 100%);
+      color: #ffffff;
+      box-shadow: 0 0 35px rgba(16, 185, 129, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+      border-color: #34d399;
+    }
 
-        .rele-btn .led-indicator.on {
-            background: #ff6b35;
-            box-shadow: 0 0 50px #ff6b35, inset 0 0 20px rgba(255, 107, 53, 0.3);
-        }
+    .btn-rele.desligado {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      color: #475569;
+    }
 
-        .rele-btn .led-indicator.off {
-            background: #1a2a3a;
-            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.5);
-        }
+    .btn-rele:hover:not(:disabled) {
+      transform: scale(1.05);
+    }
 
-        .rele-btn .btn-label {
-            font-size: 14px;
-            color: #94a3b8;
-            letter-spacing: 1px;
-        }
+    .btn-rele.ligado:hover:not(:disabled) {
+      box-shadow: 0 0 45px rgba(16, 185, 129, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.4);
+    }
 
-        .rele-btn .btn-state {
-            font-size: 13px;
-            font-weight: bold;
-            transition: all 0.3s;
-        }
+    .btn-rele:active:not(:disabled) {
+      transform: scale(0.95);
+    }
 
-        .rele-btn .btn-state.on {
-            color: #ff6b35;
-        }
+    /* Painel de Informações */
+    .info {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 0.7rem;
+      color: #64748b;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      border: 1px solid rgba(255,255,255,0.02);
+    }
 
-        .rele-btn .btn-state.off {
-            color: #475569;
-        }
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+    }
 
-        .rele-hint {
-            color: #64748b;
-            font-size: 11px;
-            margin-top: 12px;
-            text-align: center;
-        }
-
-        .info-bar {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            padding: 15px 0;
-            margin-top: 10px;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            font-size: 11px;
-            color: #64748b;
-        }
-
-        .info-bar .row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .info-bar .mqtt-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .info-bar .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .info-bar .dot.green {
-            background: #22c55e;
-        }
-
-        .info-bar .dot.yellow {
-            background: #eab308;
-        }
-
-        .info-bar .dot.red {
-            background: #ef4444;
-        }
-
-        .info-bar .device-id {
-            color: #475569;
-            font-family: monospace;
-            font-size: 10px;
-        }
-
-        .info-bar .broker-info {
-            color: #475569;
-            font-family: monospace;
-            font-size: 10px;
-        }
-
-        .reconnect-btn {
-            background: transparent;
-            border: 1px solid #334155;
-            color: #94a3b8;
-            padding: 6px 15px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 11px;
-            transition: all 0.2s;
-        }
-
-        .reconnect-btn:hover {
-            background: #334155;
-            color: #f8fafc;
-        }
-
-        .debug-log {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            padding: 10px;
-            margin-top: 10px;
-            max-height: 100px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 10px;
-            color: #64748b;
-        }
-
-        .debug-log .log-entry {
-            padding: 2px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        }
-
-        .debug-log .log-entry.success {
-            color: #22c55e;
-        }
-
-        .debug-log .log-entry.error {
-            color: #ef4444;
-        }
-
-        .debug-log .log-entry.info {
-            color: #38bdf8;
-        }
-
-        .debug-log .log-entry.warning {
-            color: #eab308;
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 20px;
-            }
-
-            .status-container {
-                flex-direction: row;
-                gap: 10px;
-            }
-
-            .status-item {
-                padding: 12px 8px;
-            }
-
-            .led {
-                width: 40px;
-                height: 40px;
-            }
-
-            .rele-btn {
-                width: 150px;
-                height: 150px;
-            }
-
-            .rele-btn .led-indicator {
-                width: 35px;
-                height: 35px;
-            }
-        }
-    </style>
+    .info-item code {
+      color: #38bdf8;
+      font-family: monospace;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>
-            🎛️ Controle do Radar
-            <span class="subtitle">MQTT</span>
-        </h1>
 
-        <div class="status-container">
-            <div class="status-item">
-                <span class="label">📡 Página Web</span>
-                <div class="led online" id="pageLed"></div>
-                <span class="status-text online" id="pageStatus">Online</span>
-            </div>
-            <div class="status-item">
-                <span class="label">🔌 ESP32</span>
-                <div class="led unknown" id="espLed"></div>
-                <span class="status-text unknown" id="espStatus">Desconectado</span>
-            </div>
-        </div>
-
-        <div class="rele-container">
-            <button class="rele-btn" id="releBtn">
-                <div class="led-indicator off" id="releLed"></div>
-                <div class="btn-label">💡 RELÉ</div>
-                <div class="btn-state off" id="releState">DESLIGADO</div>
-            </button>
-            <div class="rele-hint">
-                ⚡ Pressione e solte para alternar
-            </div>
-        </div>
-
-        <div class="info-bar">
-            <div class="row">
-                <div class="mqtt-info">
-                    <span class="dot yellow" id="mqttDot"></span>
-                    <span id="mqttStatus">Conectando...</span>
-                </div>
-                <button class="reconnect-btn" id="reconnectBtn">Reconectar</button>
-            </div>
-            <div class="row">
-                <span class="broker-info" id="brokerInfo">broker.emqx.io:8083/8084</span>
-                <span class="device-id" id="deviceId">esp32_radar_rx</span>
-            </div>
-        </div>
-
-        <div class="debug-log" id="debugLog">
-            <div class="log-entry info">🔄 Inicializando...</div>
-        </div>
+  <div class="card">
+    <div class="header">
+      <h1><i class="fa-solid fa-bolt"></i> Painel de Controle</h1>
     </div>
 
-    <script>
-        // ==================== CONFIGURAÇÃO MQTT ====================
-        const MQTT_CONFIG = {
-            broker: 'broker.emqx.io',
-            ports: [8083, 8084, 443],  // Tenta várias portas WebSocket
-            clientId: `web_${Math.random().toString(16).substr(2, 8)}`,
-            username: null,
-            password: null,
-            topics: {
-                data: 'casa/radar/data',
-                cmd: 'casa/radar/cmd'
-            },
-            deviceId: 'esp32_radar_rx'
-        };
+    <div class="status-row">
+      <div class="status-item">
+        <span>Web ↔ MQTT</span>
+        <div class="led-wrapper">
+          <div id="ledPage" class="led off"></div>
+        </div>
+      </div>
+      <div class="status-item">
+        <span>ESP32 ↔ MQTT</span>
+        <div class="led-wrapper">
+          <div id="ledEsp" class="led off"></div>
+        </div>
+      </div>
+    </div>
 
-        // ==================== ESTADO ====================
-        let client = null;
-        let isConnected = false;
-        let isPressing = false;
-        let relayState = false;
-        let reconnectTimeout = null;
-        let currentPortIndex = 0;
-        let messageCount = 0;
+    <div class="estado-container">
+      <span id="txtEstado" class="estado-badge off">Aguardando...</span>
+    </div>
 
-        // ==================== ELEMENTOS DOM ====================
-        const pageLed = document.getElementById('pageLed');
-        const pageStatus = document.getElementById('pageStatus');
-        const espLed = document.getElementById('espLed');
-        const espStatus = document.getElementById('espStatus');
-        const releBtn = document.getElementById('releBtn');
-        const releLed = document.getElementById('releLed');
-        const releState = document.getElementById('releState');
-        const mqttDot = document.getElementById('mqttDot');
-        const mqttStatus = document.getElementById('mqttStatus');
-        const deviceId = document.getElementById('deviceId');
-        const brokerInfo = document.getElementById('brokerInfo');
-        const reconnectBtn = document.getElementById('reconnectBtn');
-        const debugLog = document.getElementById('debugLog');
+    <div class="btn-container">
+      <button id="btnRele" class="btn-rele desligado" disabled aria-label="Alternar Relé">
+        <i class="fa-solid fa-power-off"></i>
+      </button>
+    </div>
 
-        // ==================== FUNÇÕES DE LOG ====================
-        function addLog(message, type = 'info') {
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            const time = new Date().toLocaleTimeString();
-            entry.textContent = `[${time}] ${message}`;
-            debugLog.appendChild(entry);
-            debugLog.scrollTop = debugLog.scrollHeight;
-            
-            while (debugLog.children.length > 30) {
-                debugLog.removeChild(debugLog.firstChild);
-            }
+    <div class="info">
+      <div class="info-item"><span>Broker:</span> <code>broker.emqx.io</code></div>
+      <div class="info-item"><span>Cmd:</span> <code>casa/rele/cmd</code></div>
+      <div class="info-item"><span>Status:</span> <code>casa/rele/status</code></div>
+    </div>
+  </div>
+
+  <script>
+    const BROKER       = "wss://broker.emqx.io:8084/mqtt";
+    const TOPIC_STATUS = "casa/rele/status";
+    const TOPIC_CMD    = "casa/rele/cmd";
+    const CLIENT_ID    = "web_rele_" + Math.random().toString(16).substr(2, 8);
+
+    let client = null;
+    let estado = false;
+    let ultimaMsg = 0;
+    const TIMEOUT = 8000;
+
+    const ledPage   = document.getElementById("ledPage");
+    const ledEsp    = document.getElementById("ledEsp");
+    const btnRele   = document.getElementById("btnRele");
+    const txtEstado = document.getElementById("txtEstado");
+
+    function atualizarBotao() {
+      if (estado) {
+        btnRele.classList.remove("desligado");
+        btnRele.classList.add("ligado");
+        
+        txtEstado.textContent = "SISTEMA LIGADO";
+        txtEstado.classList.remove("off");
+        txtEstado.classList.add("on");
+      } else {
+        btnRele.classList.remove("ligado");
+        btnRele.classList.add("desligado");
+        
+        txtEstado.textContent = "SISTEMA DESLIGADO";
+        txtEstado.classList.remove("on");
+        txtEstado.classList.add("off");
+      }
+    }
+
+    function conectar() {
+      client = mqtt.connect(BROKER, {
+        clientId: CLIENT_ID,
+        clean: true,
+        reconnectPeriod: 3000
+      });
+
+      client.on("connect", () => {
+        ledPage.classList.remove("off");
+        ledPage.classList.add("on");
+        client.subscribe(TOPIC_STATUS);
+        btnRele.disabled = false;
+      });
+
+      client.on("reconnect", () => {
+        ledPage.classList.remove("on");
+        ledPage.classList.add("off");
+        btnRele.disabled = true;
+      });
+
+      client.on("close", () => {
+        ledPage.classList.remove("on");
+        ledPage.classList.add("off");
+        btnRele.disabled = true;
+      });
+
+      client.on("error", (err) => {
+        console.error("Erro MQTT:", err);
+      });
+
+      client.on("message", (topic, message) => {
+        if (topic === TOPIC_STATUS) {
+          ultimaMsg = Date.now();
+          ledEsp.classList.remove("off");
+          ledEsp.classList.add("on");
+
+          const payload = message.toString().toLowerCase().trim();
+          estado = (payload === "on" || payload === "1" || payload === "true");
+
+          atualizarBotao();
         }
+      });
+    }
 
-        // ==================== FUNÇÕES UI ====================
-        function updatePageConnection(status) {
-            if (status === 'online') {
-                pageLed.className = 'led online';
-                pageStatus.textContent = 'Online';
-                pageStatus.className = 'status-text online';
-            } else {
-                pageLed.className = 'led offline';
-                pageStatus.textContent = 'Offline';
-                pageStatus.className = 'status-text offline';
-            }
-        }
+    setInterval(() => {
+      if (Date.now() - ultimaMsg > TIMEOUT) {
+        ledEsp.classList.remove("on");
+        ledEsp.classList.add("off");
+      }
+    }, 1500);
 
-        function updateESPConnection(status) {
-            if (status === 'online') {
-                espLed.className = 'led online';
-                espStatus.textContent = 'Online';
-                espStatus.className = 'status-text online';
-                addLog('✅ ESP32 conectado', 'success');
-            } else if (status === 'connecting') {
-                espLed.className = 'led connecting';
-                espStatus.textContent = 'Conectando...';
-                espStatus.className = 'status-text connecting';
-            } else {
-                espLed.className = 'led offline';
-                espStatus.textContent = 'Desconectado';
-                espStatus.className = 'status-text offline';
-                addLog('❌ ESP32 desconectado', 'error');
-            }
-        }
+    btnRele.addEventListener("click", () => {
+      if (!client || !client.connected) return;
+      client.publish(TOPIC_CMD, "toggle");
+    });
 
-        function updateRelay(state) {
-            relayState = state;
-            if (state) {
-                releLed.className = 'led-indicator on';
-                releState.textContent = 'LIGADO';
-                releState.className = 'btn-state on';
-                addLog('💡 Relé LIGADO', 'success');
-            } else {
-                releLed.className = 'led-indicator off';
-                releState.textContent = 'DESLIGADO';
-                releState.className = 'btn-state off';
-                addLog('💡 Relé DESLIGADO', 'info');
-            }
-        }
-
-        function updateMQTTStatus(status, text) {
-            if (status === 'connected') {
-                mqttDot.className = 'dot green';
-                mqttStatus.textContent = text || 'Conectado';
-                addLog('📡 MQTT Conectado', 'success');
-            } else if (status === 'connecting') {
-                mqttDot.className = 'dot yellow';
-                mqttStatus.textContent = text || 'Conectando...';
-                addLog('🔄 Conectando MQTT...', 'info');
-            } else {
-                mqttDot.className = 'dot red';
-                mqttStatus.textContent = text || 'Desconectado';
-                addLog('⚠️ MQTT Desconectado', 'error');
-            }
-        }
-
-        // ==================== FUNÇÕES MQTT ====================
-        function publishCommand(cmd) {
-            if (!isConnected || !client) {
-                addLog('❌ MQTT desconectado', 'error');
-                return false;
-            }
-
-            try {
-                const message = new Paho.MQTT.Message(cmd);
-                message.destinationName = MQTT_CONFIG.topics.cmd;
-                message.retained = true;
-                message.qos = 1;
-                client.send(message);
-                addLog(`📤 Comando: ${cmd}`, 'info');
-                return true;
-            } catch (err) {
-                addLog(`❌ Erro: ${err.message}`, 'error');
-                return false;
-            }
-        }
-
-        function toggleRelay() {
-            if (publishCommand('toggle')) {
-                // Aguarda confirmação
-            }
-        }
-
-        // ==================== EVENTOS DO BOTÃO ====================
-        releBtn.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            if (!isConnected) {
-                addLog('⚠️ MQTT não conectado', 'warning');
-                return;
-            }
-            isPressing = true;
-        });
-
-        releBtn.addEventListener('mouseup', (e) => {
-            e.preventDefault();
-            if (isPressing) {
-                isPressing = false;
-                toggleRelay();
-            }
-        });
-
-        releBtn.addEventListener('mouseleave', () => {
-            if (isPressing) {
-                isPressing = false;
-            }
-        });
-
-        releBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (!isConnected) {
-                addLog('⚠️ MQTT não conectado', 'warning');
-                return;
-            }
-            isPressing = true;
-        });
-
-        releBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            if (isPressing) {
-                isPressing = false;
-                toggleRelay();
-            }
-        });
-
-        releBtn.addEventListener('touchcancel', () => {
-            isPressing = false;
-        });
-
-        // ==================== MQTT CLIENT ====================
-        function tryConnectWithPort(portIndex) {
-            if (portIndex >= MQTT_CONFIG.ports.length) {
-                addLog('❌ Todas as portas falharam', 'error');
-                updateMQTTStatus('disconnected', 'Falha em todas as portas');
-                return;
-            }
-
-            const port = MQTT_CONFIG.ports[portIndex];
-            addLog(`🔗 Tentando porta ${port}...`, 'info');
-            brokerInfo.textContent = `broker.emqx.io:${port}`;
-
-            // Cria novo cliente com a porta atual
-            if (client) {
-                try { client.disconnect(); } catch(e) {}
-            }
-
-            client = new Paho.MQTT.Client(
-                MQTT_CONFIG.broker,
-                port,
-                MQTT_CONFIG.clientId
-            );
-
-            client.onConnectionLost = onConnectionLost;
-            client.onMessageArrived = onMessageArrived;
-
-            const connectOptions = {
-                onSuccess: () => {
-                    addLog(`✅ Conectado na porta ${port}`, 'success');
-                    brokerInfo.textContent = `broker.emqx.io:${port} ✅`;
-                    isConnected = true;
-                    updateMQTTStatus('connected', `Conectado (porta ${port})`);
-                    updateESPConnection('online');
-
-                    try {
-                        client.subscribe(MQTT_CONFIG.topics.data, { qos: 1 });
-                        addLog(`📡 Inscrito em: ${MQTT_CONFIG.topics.data}`, 'info');
-                        setTimeout(() => {
-                            publishCommand('status');
-                        }, 500);
-                    } catch (err) {
-                        addLog(`❌ Erro ao inscrever: ${err.message}`, 'error');
-                    }
-
-                    if (reconnectTimeout) {
-                        clearTimeout(reconnectTimeout);
-                        reconnectTimeout = null;
-                    }
-                },
-                onFailure: (error) => {
-                    addLog(`❌ Porta ${port} falhou: ${error.errorMessage || 'Erro'}`, 'error');
-                    // Tenta próxima porta
-                    tryConnectWithPort(portIndex + 1);
-                },
-                timeout: 10,
-                keepAliveInterval: 30,
-                mqttVersion: 4,
-                cleanSession: true
-            };
-
-            try {
-                client.connect(connectOptions);
-            } catch (err) {
-                addLog(`❌ Erro ao conectar porta ${port}: ${err.message}`, 'error');
-                tryConnectWithPort(portIndex + 1);
-            }
-        }
-
-        function connectMQTT() {
-            updateMQTTStatus('connecting', 'Conectando...');
-            updatePageConnection('online');
-            currentPortIndex = 0;
-            tryConnectWithPort(0);
-        }
-
-        function onConnectionLost(responseObject) {
-            if (responseObject.errorCode !== 0) {
-                addLog(`❌ Conexão perdida: ${responseObject.errorMessage || 'Erro'}`, 'error');
-                isConnected = false;
-                updateMQTTStatus('disconnected', 'Conexão perdida');
-                updateESPConnection('offline');
-
-                if (reconnectTimeout) {
-                    clearTimeout(reconnectTimeout);
-                }
-                reconnectTimeout = setTimeout(() => {
-                    addLog('🔄 Tentando reconectar...', 'info');
-                    connectMQTT();
-                }, 5000);
-            }
-        }
-
-        function onMessageArrived(message) {
-            messageCount++;
-            const payload = message.payloadString.trim();
-            
-            addLog(`📨 #${messageCount}: ${payload.substring(0, 50)}`, 'info');
-            
-            if (message.destinationName === MQTT_CONFIG.topics.data) {
-                try {
-                    const data = JSON.parse(payload);
-                    if (data.rele !== undefined) {
-                        updateRelay(data.rele === 'on' || data.rele === true);
-                    }
-                    if (data.status) {
-                        updateESPConnection('online');
-                    }
-                } catch (e) {
-                    if (payload === 'on' || payload === 'ON') {
-                        updateRelay(true);
-                        updateESPConnection('online');
-                    } else if (payload === 'off' || payload === 'OFF') {
-                        updateRelay(false);
-                        updateESPConnection('online');
-                    } else {
-                        updateESPConnection('online');
-                    }
-                }
-            }
-        }
-
-        // ==================== RECONECTAR ====================
-        reconnectBtn.addEventListener('click', () => {
-            addLog('🔄 Reconexão manual', 'info');
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-                reconnectTimeout = null;
-            }
-            connectMQTT();
-        });
-
-        // ==================== INICIALIZAÇÃO ====================
-        function init() {
-            addLog('🚀 Iniciando...', 'info');
-            addLog(`📡 Broker: ${MQTT_CONFIG.broker}`, 'info');
-            addLog(`📡 Portas: ${MQTT_CONFIG.ports.join(', ')}`, 'info');
-            addLog(`📨 Tópico: ${MQTT_CONFIG.topics.data}`, 'info');
-            addLog(`📤 Cmd: ${MQTT_CONFIG.topics.cmd}`, 'info');
-
-            deviceId.textContent = MQTT_CONFIG.deviceId;
-            updatePageConnection('online');
-
-            connectMQTT();
-
-            setInterval(() => {
-                if (!isConnected && client) {
-                    updateMQTTStatus('disconnected', 'Desconectado');
-                }
-            }, 5000);
-        }
-
-        init();
-
-        window.addEventListener('beforeunload', () => {
-            if (client && isConnected) {
-                try { client.disconnect(); } catch(e) {}
-            }
-            if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-            }
-        });
-
-        addLog('✅ Página carregada', 'success');
-    </script>
+    conectar();
+    atualizarBotao();
+  </script>
 </body>
 </html>
