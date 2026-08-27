@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Controle do Relé - MQTT</title>
+    <title>Controle do Radar - MQTT</title>
     <script src="https://cdn.jsdelivr.net/npm/paho-mqtt@1.1.0/paho-mqtt.min.js"></script>
     <style>
         * {
@@ -217,12 +217,19 @@
         /* Info Bar */
         .info-bar {
             display: flex;
-            justify-content: space-between;
+            flex-direction: column;
+            gap: 10px;
             padding: 15px 0;
             margin-top: 10px;
             border-top: 1px solid rgba(255, 255, 255, 0.05);
             font-size: 11px;
             color: #64748b;
+        }
+
+        .info-bar .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .info-bar .mqtt-info {
@@ -256,6 +263,12 @@
             font-size: 10px;
         }
 
+        .info-bar .broker-info {
+            color: #475569;
+            font-family: monospace;
+            font-size: 10px;
+        }
+
         /* Botão de reconectar */
         .reconnect-btn {
             background: transparent;
@@ -271,6 +284,36 @@
         .reconnect-btn:hover {
             background: #334155;
             color: #f8fafc;
+        }
+
+        /* Debug */
+        .debug-log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+            max-height: 80px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 10px;
+            color: #64748b;
+        }
+
+        .debug-log .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .debug-log .log-entry.success {
+            color: #22c55e;
+        }
+
+        .debug-log .log-entry.error {
+            color: #ef4444;
+        }
+
+        .debug-log .log-entry.info {
+            color: #38bdf8;
         }
 
         /* Responsivo */
@@ -308,7 +351,7 @@
 <body>
     <div class="container">
         <h1>
-            🎛️ Controle do Relé
+            🎛️ Controle do Radar
             <span class="subtitle">MQTT</span>
         </h1>
 
@@ -340,14 +383,22 @@
 
         <!-- Info Bar -->
         <div class="info-bar">
-            <div class="mqtt-info">
-                <span class="dot yellow" id="mqttDot"></span>
-                <span id="mqttStatus">Conectando...</span>
+            <div class="row">
+                <div class="mqtt-info">
+                    <span class="dot yellow" id="mqttDot"></span>
+                    <span id="mqttStatus">Conectando...</span>
+                </div>
+                <button class="reconnect-btn" id="reconnectBtn">Reconectar</button>
             </div>
-            <div>
-                <span class="device-id" id="deviceId">esp32_rele_casa</span>
+            <div class="row">
+                <span class="broker-info" id="brokerInfo">broker.emqx.io:8083</span>
+                <span class="device-id" id="deviceId">esp32_radar_rx</span>
             </div>
-            <button class="reconnect-btn" id="reconnectBtn">Reconectar</button>
+        </div>
+
+        <!-- Debug Log -->
+        <div class="debug-log" id="debugLog">
+            <div class="log-entry info">🔄 Inicializando...</div>
         </div>
     </div>
 
@@ -357,12 +408,13 @@
             broker: 'broker.emqx.io',
             port: 8083,  // WebSocket port
             clientId: `web_${Math.random().toString(16).substr(2, 8)}`,
-            username: null,  // EMQX não requer usuário/senha
+            username: null,
             password: null,
             topics: {
-                status: 'casa/rele/status',
-                cmd: 'casa/rele/cmd'
-            }
+                data: 'casa/radar/data',  // Dados do radar
+                cmd: 'casa/radar/cmd'      // Comandos para o ESP
+            },
+            deviceId: 'esp32_radar_rx'
         };
 
         // ==================== ESTADO ====================
@@ -371,6 +423,7 @@
         let isPressing = false;
         let relayState = false;
         let reconnectTimeout = null;
+        let messageCount = 0;
 
         // ==================== ELEMENTOS DOM ====================
         const pageLed = document.getElementById('pageLed');
@@ -383,7 +436,24 @@
         const mqttDot = document.getElementById('mqttDot');
         const mqttStatus = document.getElementById('mqttStatus');
         const deviceId = document.getElementById('deviceId');
+        const brokerInfo = document.getElementById('brokerInfo');
         const reconnectBtn = document.getElementById('reconnectBtn');
+        const debugLog = document.getElementById('debugLog');
+
+        // ==================== FUNÇÕES DE LOG ====================
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            debugLog.appendChild(entry);
+            debugLog.scrollTop = debugLog.scrollHeight;
+            
+            // Mantém apenas as últimas 20 mensagens
+            while (debugLog.children.length > 20) {
+                debugLog.removeChild(debugLog.firstChild);
+            }
+        }
 
         // ==================== FUNÇÕES UI ====================
         function updatePageConnection(status) {
@@ -403,6 +473,7 @@
                 espLed.className = 'led online';
                 espStatus.textContent = 'Online';
                 espStatus.className = 'status-text online';
+                addLog('✅ ESP32 conectado', 'success');
             } else if (status === 'connecting') {
                 espLed.className = 'led connecting';
                 espStatus.textContent = 'Conectando...';
@@ -411,6 +482,7 @@
                 espLed.className = 'led offline';
                 espStatus.textContent = 'Desconectado';
                 espStatus.className = 'status-text offline';
+                addLog('❌ ESP32 desconectado', 'error');
             }
         }
 
@@ -420,10 +492,12 @@
                 releLed.className = 'led-indicator on';
                 releState.textContent = 'LIGADO';
                 releState.className = 'btn-state on';
+                addLog('💡 Relé LIGADO', 'success');
             } else {
                 releLed.className = 'led-indicator off';
                 releState.textContent = 'DESLIGADO';
                 releState.className = 'btn-state off';
+                addLog('💡 Relé DESLIGADO', 'info');
             }
         }
 
@@ -431,23 +505,22 @@
             if (status === 'connected') {
                 mqttDot.className = 'dot green';
                 mqttStatus.textContent = text || 'Conectado';
-                updateESPConnection('online');
+                addLog('📡 MQTT Conectado', 'success');
             } else if (status === 'connecting') {
                 mqttDot.className = 'dot yellow';
                 mqttStatus.textContent = text || 'Conectando...';
-                updateESPConnection('connecting');
+                addLog('🔄 Conectando MQTT...', 'info');
             } else {
                 mqttDot.className = 'dot red';
                 mqttStatus.textContent = text || 'Desconectado';
-                updateESPConnection('offline');
+                addLog('⚠️ MQTT Desconectado', 'error');
             }
         }
 
         // ==================== FUNÇÕES MQTT ====================
         function publishCommand(cmd) {
             if (!isConnected || !client) {
-                console.warn('MQTT não conectado');
-                updateMQTTStatus('disconnected', 'Sem conexão');
+                addLog('❌ Não é possível enviar: MQTT desconectado', 'error');
                 return false;
             }
 
@@ -457,36 +530,36 @@
                 message.retained = true;
                 message.qos = 1;
                 client.send(message);
-                console.log(`✅ Comando enviado: ${cmd}`);
+                addLog(`📤 Comando enviado: ${cmd}`, 'info');
                 return true;
             } catch (err) {
-                console.error('❌ Erro ao enviar comando:', err);
+                addLog(`❌ Erro ao enviar: ${err.message}`, 'error');
                 return false;
             }
         }
 
         function toggleRelay() {
             if (publishCommand('toggle')) {
-                // A UI será atualizada quando receber a confirmação via MQTT
-                console.log('Toggle enviado');
+                // Aguarda a confirmação via MQTT
             }
         }
 
         // ==================== EVENTOS DO BOTÃO ====================
-        // Mouse events
         releBtn.addEventListener('mousedown', (e) => {
             e.preventDefault();
             if (!isConnected) {
-                updateMQTTStatus('disconnected', 'Sem conexão!');
+                addLog('⚠️ Clique no botão, mas MQTT não está conectado', 'error');
                 return;
             }
             isPressing = true;
+            addLog('👆 Botão pressionado (aguardando soltar...)', 'info');
         });
 
         releBtn.addEventListener('mouseup', (e) => {
             e.preventDefault();
             if (isPressing) {
                 isPressing = false;
+                addLog('🖱️ Botão solto - enviando toggle', 'info');
                 toggleRelay();
             }
         });
@@ -494,29 +567,33 @@
         releBtn.addEventListener('mouseleave', () => {
             if (isPressing) {
                 isPressing = false;
+                addLog('🖱️ Mouse saiu do botão', 'info');
             }
         });
 
-        // Touch events (mobile)
+        // Touch events
         releBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (!isConnected) {
-                updateMQTTStatus('disconnected', 'Sem conexão!');
+                addLog('⚠️ Toque no botão, mas MQTT não está conectado', 'error');
                 return;
             }
             isPressing = true;
+            addLog('👆 Toque iniciado (aguardando soltar...)', 'info');
         });
 
         releBtn.addEventListener('touchend', (e) => {
             e.preventDefault();
             if (isPressing) {
                 isPressing = false;
+                addLog('🖱️ Toque finalizado - enviando toggle', 'info');
                 toggleRelay();
             }
         });
 
         releBtn.addEventListener('touchcancel', () => {
             isPressing = false;
+            addLog('❌ Toque cancelado', 'info');
         });
 
         // ==================== MQTT CLIENT ====================
@@ -527,11 +604,9 @@
                 MQTT_CONFIG.clientId
             );
 
-            // Callbacks
             client.onConnectionLost = onConnectionLost;
             client.onMessageArrived = onMessageArrived;
 
-            // Conecta
             connectMQTT();
         }
 
@@ -552,41 +627,34 @@
                 cleanSession: true
             };
 
-            // Adiciona credenciais se necessário
-            if (MQTT_CONFIG.username) {
-                connectOptions.userName = MQTT_CONFIG.username;
-                connectOptions.password = MQTT_CONFIG.password;
-            }
-
             try {
+                addLog(`🔗 Conectando ao broker ${MQTT_CONFIG.broker}:${MQTT_CONFIG.port}...`, 'info');
                 client.connect(connectOptions);
             } catch (err) {
-                console.error('Erro ao conectar:', err);
+                addLog(`❌ Erro ao conectar: ${err.message}`, 'error');
                 onConnectFailure({ errorMessage: err.message });
             }
         }
 
         function onConnect() {
-            console.log('✅ Conectado ao MQTT broker');
+            addLog('✅ Conectado ao MQTT broker', 'success');
             isConnected = true;
             updateMQTTStatus('connected', 'Conectado');
 
-            // Inscreve no tópico de status
+            // Inscreve no tópico de dados
             try {
-                client.subscribe(MQTT_CONFIG.topics.status, { qos: 1 });
-                console.log(`📡 Inscrito em: ${MQTT_CONFIG.topics.status}`);
+                client.subscribe(MQTT_CONFIG.topics.data, { qos: 1 });
+                addLog(`📡 Inscrito em: ${MQTT_CONFIG.topics.data}`, 'info');
                 
-                // Publica um comando para solicitar o estado atual
-                // O ESP32 publica automaticamente o estado ao conectar
-                // Mas vamos enviar um comando para garantir
+                // Envia comando para solicitar estado
                 setTimeout(() => {
+                    addLog('📤 Solicitando estado atual...', 'info');
                     publishCommand('status');
                 }, 500);
             } catch (err) {
-                console.error('Erro ao inscrever:', err);
+                addLog(`❌ Erro ao inscrever: ${err.message}`, 'error');
             }
 
-            // Limpa timeout de reconexão
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
                 reconnectTimeout = null;
@@ -594,60 +662,88 @@
         }
 
         function onConnectFailure(error) {
-            console.error('❌ Falha na conexão MQTT:', error);
+            addLog(`❌ Falha na conexão: ${error.errorMessage || 'Erro desconhecido'}`, 'error');
             isConnected = false;
             updateMQTTStatus('disconnected', 'Falha na conexão');
 
-            // Tenta reconectar após 5 segundos
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
             }
             reconnectTimeout = setTimeout(() => {
-                console.log('🔄 Tentando reconectar...');
+                addLog('🔄 Tentando reconectar...', 'info');
                 connectMQTT();
             }, 5000);
         }
 
         function onConnectionLost(responseObject) {
             if (responseObject.errorCode !== 0) {
-                console.log('❌ Conexão perdida:', responseObject.errorMessage || 'Erro desconhecido');
+                addLog(`❌ Conexão perdida: ${responseObject.errorMessage || 'Erro desconhecido'}`, 'error');
                 isConnected = false;
                 updateMQTTStatus('disconnected', 'Conexão perdida');
                 updateESPConnection('offline');
 
-                // Tenta reconectar após 3 segundos
                 if (reconnectTimeout) {
                     clearTimeout(reconnectTimeout);
                 }
                 reconnectTimeout = setTimeout(() => {
-                    console.log('🔄 Tentando reconectar...');
+                    addLog('🔄 Tentando reconectar...', 'info');
                     connectMQTT();
                 }, 3000);
             }
         }
 
         function onMessageArrived(message) {
-            console.log(`📨 Mensagem recebida [${message.destinationName}]: ${message.payloadString}`);
+            messageCount++;
+            const payload = message.payloadString.trim();
             
-            if (message.destinationName === MQTT_CONFIG.topics.status) {
-                const payload = message.payloadString.toLowerCase().trim();
-                
-                if (payload === 'on') {
-                    updateRelay(true);
-                } else if (payload === 'off') {
-                    updateRelay(false);
-                } else {
-                    console.warn('Payload desconhecido:', payload);
+            addLog(`📨 Mensagem #${messageCount} [${message.destinationName}]: ${payload}`, 'info');
+            
+            if (message.destinationName === MQTT_CONFIG.topics.data) {
+                try {
+                    // Tenta parsear como JSON
+                    const data = JSON.parse(payload);
+                    
+                    // Atualiza estado do relé se presente
+                    if (data.rele !== undefined) {
+                        updateRelay(data.rele === 'on' || data.rele === true);
+                    }
+                    
+                    // Atualiza se o ESP está online
+                    if (data.status) {
+                        updateESPConnection('online');
+                    }
+                    
+                    // Se tiver dados do radar
+                    if (data.rssi !== undefined) {
+                        addLog(`📊 RSSI: ${data.rssi} dBm`, 'info');
+                    }
+                    
+                } catch (e) {
+                    // Se não for JSON, tenta como texto simples
+                    if (payload === 'on' || payload === 'ON') {
+                        updateRelay(true);
+                        updateESPConnection('online');
+                    } else if (payload === 'off' || payload === 'OFF') {
+                        updateRelay(false);
+                        updateESPConnection('online');
+                    } else if (payload.includes('RSSI')) {
+                        // Extrai RSSI se presente
+                        const match = payload.match(/RSSI[:\s]+([-]?\d+)/i);
+                        if (match) {
+                            addLog(`📊 RSSI: ${match[1]} dBm`, 'info');
+                        }
+                        updateESPConnection('online');
+                    } else {
+                        addLog(`📨 Dados recebidos: ${payload}`, 'info');
+                        updateESPConnection('online');
+                    }
                 }
-
-                // ESP está online
-                updateESPConnection('online');
             }
         }
 
         // ==================== RECONECTAR MANUAL ====================
         reconnectBtn.addEventListener('click', () => {
-            console.log('🔄 Reconexão manual solicitada');
+            addLog('🔄 Reconexão manual solicitada', 'info');
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
                 reconnectTimeout = null;
@@ -657,16 +753,17 @@
 
         // ==================== INICIALIZAÇÃO ====================
         function init() {
-            console.log('🚀 Iniciando controle MQTT...');
-            console.log(`📡 Broker: ${MQTT_CONFIG.broker}:${MQTT_CONFIG.port}`);
-            console.log(`📱 Client ID: ${MQTT_CONFIG.clientId}`);
-            console.log(`📨 Tópico status: ${MQTT_CONFIG.topics.status}`);
-            console.log(`📤 Tópico comando: ${MQTT_CONFIG.topics.cmd}`);
+            addLog('🚀 Iniciando controle MQTT...', 'info');
+            addLog(`📡 Broker: ${MQTT_CONFIG.broker}:${MQTT_CONFIG.port}`, 'info');
+            addLog(`📱 Client ID: ${MQTT_CONFIG.clientId}`, 'info');
+            addLog(`📨 Tópico dados: ${MQTT_CONFIG.topics.data}`, 'info');
+            addLog(`📤 Tópico comando: ${MQTT_CONFIG.topics.cmd}`, 'info');
+            addLog(`🔌 Device ID: ${MQTT_CONFIG.deviceId}`, 'info');
 
-            deviceId.textContent = MQTT_CONFIG.clientId;
+            deviceId.textContent = MQTT_CONFIG.deviceId;
+            brokerInfo.textContent = `${MQTT_CONFIG.broker}:${MQTT_CONFIG.port}`;
             updatePageConnection('online');
 
-            // Cria e conecta o cliente MQTT
             createMQTTClient();
 
             // Verifica periodicamente a conexão
@@ -677,24 +774,21 @@
             }, 5000);
         }
 
-        // Inicia quando a página carregar
         init();
 
-        // Limpeza ao fechar
         window.addEventListener('beforeunload', () => {
             if (client && isConnected) {
                 try {
                     client.disconnect();
-                } catch (e) {
-                    // Ignora erros ao desconectar
-                }
+                    addLog('🔌 Desconectado', 'info');
+                } catch (e) {}
             }
             if (reconnectTimeout) {
                 clearTimeout(reconnectTimeout);
             }
         });
 
-        console.log('✅ Página carregada com sucesso!');
+        addLog('✅ Página carregada com sucesso!', 'success');
     </script>
 </body>
 </html>
