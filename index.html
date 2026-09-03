@@ -186,12 +186,13 @@
             topics: {
                 energia: { cmd: 'casa/energia/cmd', status: 'casa/energia/status' },
                 agua:    { cmd: 'casa/agua/cmd',    status: 'casa/agua/status' },
-                esp:     'casa/esp32/status' // NOVO: Tópico de status de vida do ESP
+                heartbeat: 'casa/esp32/heartbeat'
             }
         };
 
         let client = null;
         let states = { energia: false, agua: false };
+        let lastEspActivity = 0; // Monitor de atividade do ESP32
 
         const els = {
             pageLed: document.getElementById('pageLed'), pageStatus: document.getElementById('pageStatus'),
@@ -269,7 +270,7 @@
                 els.pageLed.className = 'led offline';
                 els.pageStatus.textContent = 'Offline';
                 els.pageStatus.className = 'status-text offline';
-                updateESPStatus(false); // Se a página cair, mostra ESP desconectado também
+                updateESPStatus(false);
                 els.btnEnergia.disabled = true;
                 els.btnAgua.disabled = true;
                 addLog('⚠️ MQTT Desconectado', 'error');
@@ -284,7 +285,7 @@
                 updateMQTTStatus('connected', 'Conectado');
                 client.subscribe(MQTT_CONFIG.topics.energia.status, { qos: 1 });
                 client.subscribe(MQTT_CONFIG.topics.agua.status, { qos: 1 });
-                client.subscribe(MQTT_CONFIG.topics.esp, { qos: 1 }); // Inscreve no LWT
+                client.subscribe(MQTT_CONFIG.topics.heartbeat, { qos: 1 });
                 
                 setTimeout(() => {
                     client.publish(MQTT_CONFIG.topics.energia.cmd, 'status', { qos: 1 });
@@ -302,8 +303,10 @@
             client.on('message', (topic, message) => {
                 const payload = message.toString().toLowerCase().trim();
                 
-                if (topic === MQTT_CONFIG.topics.esp) {
-                    // 🚨 AQUI ESTÁ A MÁGICA: Reage instantaneamente ao LWT do broker
+                // Atualiza o timestamp de atividade a CADA mensagem do ESP32
+                lastEspActivity = Date.now();
+
+                if (topic === MQTT_CONFIG.topics.heartbeat) {
                     updateESPStatus(payload === 'online');
                 }
                 else if (topic === MQTT_CONFIG.topics.energia.status) {
@@ -330,6 +333,14 @@
             if (client) client.end(true);
             connectMQTT();
         });
+
+        // 🚨 MONITOR DE TIMEOUT INFALÍVEL (Heartbeat Check)
+        // Verifica a cada 3 segundos se o ESP32 enviou algo nos últimos 12 segundos
+        setInterval(() => {
+            if (lastEspActivity > 0 && (Date.now() - lastEspActivity > 12000)) {
+                updateESPStatus(false); // Força o status para Offline
+            }
+        }, 3000);
 
         function init() {
             addLog('🚀 Iniciando Painel de Controle...', 'info');
