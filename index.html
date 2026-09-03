@@ -5,436 +5,128 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Painel de Controle - Cortes</title>
     
-    <!-- Bibliotecas Externas -->
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html, body {
-            height: 100%;
-            overflow: hidden; /* Impede rolagem */
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; overflow: hidden; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #0f172a, #1e1b4b);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-            color: #e2e8f0;
+            display: flex; justify-content: center; align-items: center;
+            padding: 10px; color: #e2e8f0;
         }
-
         .container {
-            background: rgba(30, 41, 59, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 20px;
-            width: 100%;
-            max-width: 600px;
-            max-height: 100vh;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            display: flex;
-            flex-direction: column;
+            background: rgba(30, 41, 59, 0.95); backdrop-filter: blur(10px);
+            border-radius: 20px; padding: 20px; width: 100%; max-width: 600px;
+            max-height: 100vh; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05); display: flex; flex-direction: column;
         }
-
         h1 {
-            text-align: center;
-            color: #38bdf8;
-            font-size: 18px;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            flex-shrink: 0;
+            text-align: center; color: #38bdf8; font-size: 18px; margin-bottom: 15px;
+            display: flex; align-items: center; justify-content: center; gap: 8px; flex-shrink: 0;
         }
-
         h1 .subtitle {
-            font-size: 11px;
-            color: #94a3b8;
-            font-weight: normal;
-            background: rgba(56, 189, 248, 0.1);
-            padding: 3px 8px;
-            border-radius: 10px;
+            font-size: 11px; color: #94a3b8; font-weight: normal;
+            background: rgba(56, 189, 248, 0.1); padding: 3px 8px; border-radius: 10px;
         }
-
-        /* Status Grid (Web e ESP32) */
-        .status-container {
-            display: flex;
-            justify-content: space-around;
-            gap: 10px;
-            margin-bottom: 15px;
-            flex-shrink: 0;
-        }
-
+        .status-container { display: flex; justify-content: space-around; gap: 10px; margin-bottom: 15px; flex-shrink: 0; }
         .status-item {
-            flex: 1;
-            text-align: center;
-            padding: 8px 6px;
-            background: rgba(15, 23, 42, 0.6);
-            border-radius: 10px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            flex: 1; text-align: center; padding: 8px 6px; background: rgba(15, 23, 42, 0.6);
+            border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.05);
         }
-
-        .status-item .label {
-            display: block;
-            font-size: 9px;
-            color: #94a3b8;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .led {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            margin: 0 auto 6px;
-            transition: all 0.5s ease;
-            border: 2px solid rgba(255, 255, 255, 0.1);
-        }
-
+        .status-item .label { display: block; font-size: 9px; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .led { width: 30px; height: 30px; border-radius: 50%; margin: 0 auto 6px; transition: all 0.5s ease; border: 2px solid rgba(255, 255, 255, 0.1); }
         .led.online { background: #22c55e; box-shadow: 0 0 15px #22c55e, inset 0 0 10px rgba(34, 197, 94, 0.3); border-color: #22c55e; }
         .led.offline { background: #ef4444; box-shadow: 0 0 15px #ef4444, inset 0 0 10px rgba(239, 68, 68, 0.3); border-color: #ef4444; }
         .led.connecting { background: #eab308; box-shadow: 0 0 15px #eab308; border-color: #eab308; animation: pulse 1s infinite; }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.7; }
-        }
-
+        @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } }
         .status-text { font-size: 10px; color: #94a3b8; }
         .status-text.online { color: #22c55e; }
         .status-text.offline { color: #ef4444; }
         .status-text.connecting { color: #eab308; }
 
-        /* Grid de Botões */
-        .buttons-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin: 10px 0;
-            flex: 1;
-            align-items: center;
-        }
-
-        .rele-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
+        .buttons-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 10px 0; flex: 1; align-items: center; }
+        .rele-container { display: flex; flex-direction: column; align-items: center; }
         .rele-btn {
-            width: 100%;
-            max-width: 130px;
-            height: 130px;
-            border-radius: 50%;
-            border: none;
-            background: linear-gradient(145deg, #1a2a4a, #0a1525);
-            color: white;
-            font-size: 11px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.05);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-            position: relative;
+            width: 100%; max-width: 130px; height: 130px; border-radius: 50%; border: none;
+            background: linear-gradient(145deg, #1a2a4a, #0a1525); color: white; font-size: 11px; font-weight: bold;
+            cursor: pointer; transition: all 0.2s ease; box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.05);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+            user-select: none; -webkit-tap-highlight-color: transparent; position: relative;
         }
-
-        .rele-btn:active {
-            transform: scale(0.92);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-        }
-
-        .rele-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .rele-btn .led-indicator {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            transition: all 0.4s ease;
-            box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5);
-        }
-
-        /* 🔴 COR DO LED QUANDO CORTADO (Vermelho) */
-        .rele-btn .led-indicator.on {
-            background: #ef4444;
-            box-shadow: 0 0 30px #ef4444, inset 0 0 10px rgba(239, 68, 68, 0.3);
-        }
-
-        /* 🟢 COR DO LED QUANDO NORMAL (Verde) */
-        .rele-btn .led-indicator.off {
-            background: #196deb;
-            box-shadow: 0 0 30px #196deb, inset 0 0 10px rgba(34, 197, 94, 0.3);
-        }
-
-        .rele-btn .btn-icon {
-            font-size: 22px;
-            margin-bottom: 2px;
-        }
-
-        .rele-btn .btn-state {
-            font-size: 11px;
-            font-weight: bold;
-            transition: all 0.3s;
-        }
-
-        /* 🔴 COR DO TEXTO QUANDO CORTADO (Vermelho) */
+        .rele-btn:active { transform: scale(0.92); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4); }
+        .rele-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .rele-btn .led-indicator { width: 30px; height: 30px; border-radius: 50%; transition: all 0.4s ease; box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5); }
+        .rele-btn .led-indicator.on { background: #ef4444; box-shadow: 0 0 30px #ef4444, inset 0 0 10px rgba(239, 68, 68, 0.3); }
+        .rele-btn .led-indicator.off { background: #196deb; box-shadow: 0 0 30px #196deb, inset 0 0 10px rgba(34, 197, 94, 0.3); }
+        .rele-btn .btn-icon { font-size: 22px; margin-bottom: 2px; }
+        .rele-btn .btn-state { font-size: 11px; font-weight: bold; transition: all 0.3s; }
         .rele-btn .btn-state.on { color: #ef4444; }
-        
-        /* 🟢 COR DO TEXTO QUANDO NORMAL (Verde) */
         .rele-btn .btn-state.off { color: #22c55e; }
+        .rele-hint { color: #64748b; font-size: 9px; margin-top: 6px; text-align: center; }
 
-        .rele-hint {
-            color: #64748b;
-            font-size: 9px;
-            margin-top: 6px;
-            text-align: center;
-        }
-
-        /* Barra de Informações */
         .info-bar {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            padding: 10px;
-            margin-top: 10px;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-            font-size: 10px;
-            color: #64748b;
-            background: rgba(15, 23, 42, 0.4);
-            border-radius: 10px;
-            flex-shrink: 0;
+            display: flex; flex-direction: column; gap: 6px; padding: 10px; margin-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05); font-size: 10px; color: #64748b;
+            background: rgba(15, 23, 42, 0.4); border-radius: 10px; flex-shrink: 0;
         }
-
-        .info-bar .row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .info-bar .mqtt-info {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .info-bar .dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            display: inline-block;
-        }
+        .info-bar .row { display: flex; justify-content: space-between; align-items: center; }
+        .info-bar .mqtt-info { display: flex; align-items: center; gap: 6px; }
+        .info-bar .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
         .info-bar .dot.green { background: #22c55e; }
         .info-bar .dot.yellow { background: #eab308; }
         .info-bar .dot.red { background: #ef4444; }
-
-        .info-bar code {
-            font-family: monospace;
-            background: rgba(255,255,255,0.05);
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 9px;
-        }
-
-        .reconnect-btn {
-            background: transparent;
-            border: 1px solid #334155;
-            color: #94a3b8;
-            padding: 3px 10px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 9px;
-            transition: all 0.2s;
-        }
+        .info-bar code { font-family: monospace; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 3px; font-size: 9px; }
+        .reconnect-btn { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 3px 10px; border-radius: 5px; cursor: pointer; font-size: 9px; transition: all 0.2s; }
         .reconnect-btn:hover { background: #334155; color: #f8fafc; }
-
         .debug-log {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 6px;
-            padding: 8px;
-            margin-top: 8px;
-            max-height: 60px;
-            overflow-y: auto;
-            font-family: monospace;
-            font-size: 9px;
-            color: #64748b;
-            flex-shrink: 0;
+            background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 8px; margin-top: 8px;
+            max-height: 60px; overflow-y: auto; font-family: monospace; font-size: 9px; color: #64748b; flex-shrink: 0;
         }
-
-        .debug-log .log-entry {
-            padding: 1px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-        }
+        .debug-log .log-entry { padding: 1px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.03); }
         .debug-log .log-entry.success { color: #22c55e; }
         .debug-log .log-entry.error { color: #ef4444; }
         .debug-log .log-entry.info { color: #38bdf8; }
         .debug-log .log-entry.warning { color: #eab308; }
 
-        /* ============================================================
-           RESPONSIVIDADE PARA CELULARES PEQUENOS
-           ============================================================ */
         @media (max-width: 480px) {
-            body {
-                padding: 8px;
-            }
-
-            .container {
-                padding: 15px;
-                border-radius: 16px;
-            }
-
-            h1 {
-                font-size: 16px;
-                margin-bottom: 12px;
-            }
-
-            h1 .subtitle {
-                font-size: 10px;
-                padding: 2px 6px;
-            }
-
-            .status-container {
-                gap: 8px;
-                margin-bottom: 12px;
-            }
-
-            .status-item {
-                padding: 6px 4px;
-            }
-
-            .status-item .label {
-                font-size: 8px;
-                margin-bottom: 4px;
-            }
-
-            .led {
-                width: 25px;
-                height: 25px;
-                margin-bottom: 4px;
-            }
-
-            .status-text {
-                font-size: 9px;
-            }
-
-            .buttons-grid {
-                gap: 12px;
-                margin: 8px 0;
-            }
-
-            .rele-btn {
-                max-width: 110px;
-                height: 110px;
-                font-size: 10px;
-                gap: 4px;
-            }
-
-            .rele-btn .led-indicator {
-                width: 25px;
-                height: 25px;
-            }
-
-            .rele-btn .btn-icon {
-                font-size: 18px;
-            }
-
-            .rele-btn .btn-state {
-                font-size: 10px;
-            }
-
-            .rele-hint {
-                font-size: 8px;
-                margin-top: 4px;
-            }
-
-            .info-bar {
-                padding: 8px;
-                margin-top: 8px;
-                font-size: 9px;
-            }
-
-            .info-bar code {
-                font-size: 8px;
-                padding: 1px 4px;
-            }
-
-            .reconnect-btn {
-                padding: 2px 8px;
-                font-size: 8px;
-            }
-
-            .debug-log {
-                max-height: 50px;
-                padding: 6px;
-                font-size: 8px;
-            }
+            body { padding: 8px; }
+            .container { padding: 15px; border-radius: 16px; }
+            h1 { font-size: 16px; margin-bottom: 12px; }
+            h1 .subtitle { font-size: 10px; padding: 2px 6px; }
+            .status-container { gap: 8px; margin-bottom: 12px; }
+            .status-item { padding: 6px 4px; }
+            .status-item .label { font-size: 8px; margin-bottom: 4px; }
+            .led { width: 25px; height: 25px; margin-bottom: 4px; }
+            .status-text { font-size: 9px; }
+            .buttons-grid { gap: 12px; margin: 8px 0; }
+            .rele-btn { max-width: 110px; height: 110px; font-size: 10px; gap: 4px; }
+            .rele-btn .led-indicator { width: 25px; height: 25px; }
+            .rele-btn .btn-icon { font-size: 18px; }
+            .rele-btn .btn-state { font-size: 10px; }
+            .rele-hint { font-size: 8px; margin-top: 4px; }
+            .info-bar { padding: 8px; margin-top: 8px; font-size: 9px; }
+            .info-bar code { font-size: 8px; padding: 1px 4px; }
+            .reconnect-btn { padding: 2px 8px; font-size: 8px; }
+            .debug-log { max-height: 50px; padding: 6px; font-size: 8px; }
         }
-
-        /* Para telas muito pequenas (iPhone SE, etc) */
         @media (max-height: 667px) and (max-width: 480px) {
-            .container {
-                padding: 12px;
-            }
-
-            h1 {
-                font-size: 15px;
-                margin-bottom: 10px;
-            }
-
-            .status-container {
-                margin-bottom: 10px;
-            }
-
-            .buttons-grid {
-                gap: 10px;
-                margin: 6px 0;
-            }
-
-            .rele-btn {
-                max-width: 100px;
-                height: 100px;
-            }
-
-            .rele-btn .led-indicator {
-                width: 22px;
-                height: 22px;
-            }
-
-            .rele-btn .btn-icon {
-                font-size: 16px;
-            }
-
-            .debug-log {
-                max-height: 40px;
-            }
+            .container { padding: 12px; }
+            h1 { font-size: 15px; margin-bottom: 10px; }
+            .status-container { margin-bottom: 10px; }
+            .buttons-grid { gap: 10px; margin: 6px 0; }
+            .rele-btn { max-width: 100px; height: 100px; }
+            .rele-btn .led-indicator { width: 22px; height: 22px; }
+            .rele-btn .btn-icon { font-size: 16px; }
+            .debug-log { max-height: 40px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>
-            <i class="fa-solid fa-sliders"></i> Painel de Controle
-            <span class="subtitle">MQTT</span>
-        </h1>
+        <h1><i class="fa-solid fa-sliders"></i> Painel de Controle <span class="subtitle">MQTT</span></h1>
 
         <div class="status-container">
             <div class="status-item">
@@ -450,7 +142,6 @@
         </div>
 
         <div class="buttons-grid">
-            <!-- Botão 1: Corte Energia -->
             <div class="rele-container">
                 <button class="rele-btn" id="btnEnergia" disabled>
                     <div class="led-indicator off" id="ledEnergia"></div>
@@ -460,8 +151,6 @@
                 </button>
                 <div class="rele-hint">Pressione para alternar</div>
             </div>
-
-            <!-- Botão 2: Corte Água -->
             <div class="rele-container">
                 <button class="rele-btn" id="btnAgua" disabled>
                     <div class="led-indicator off" id="ledAgua"></div>
@@ -481,14 +170,8 @@
                 </div>
                 <button class="reconnect-btn" id="reconnectBtn">Reconectar</button>
             </div>
-            <div class="row">
-                <span>Broker</span>
-                <code id="brokerInfo">broker.emqx.io:8084</code>
-            </div>
-            <div class="row">
-                <span>Client ID</span>
-                <code id="clientIdDisplay">web_xxxxxx</code>
-            </div>
+            <div class="row"><span>Broker</span><code id="brokerInfo">broker.emqx.io:8084</code></div>
+            <div class="row"><span>Client ID</span><code id="clientIdDisplay">web_xxxxxx</code></div>
         </div>
 
         <div class="debug-log" id="debugLog">
@@ -497,87 +180,69 @@
     </div>
 
     <script>
-        // ==================== CONFIGURAÇÃO MQTT ====================
         const MQTT_CONFIG = {
             broker: 'wss://broker.emqx.io:8084/mqtt',
             clientId: `web_${Math.random().toString(16).substr(2, 8)}`,
             topics: {
                 energia: { cmd: 'casa/energia/cmd', status: 'casa/energia/status' },
-                agua:    { cmd: 'casa/agua/cmd',    status: 'casa/agua/status' }
+                agua:    { cmd: 'casa/agua/cmd',    status: 'casa/agua/status' },
+                esp:     'casa/esp32/status' // NOVO: Tópico de status de vida do ESP
             }
         };
 
-        // ==================== ESTADO ====================
         let client = null;
-        let isConnected = false;
         let states = { energia: false, agua: false };
-        let lastMsgTime = { energia: 0, agua: 0 };
-        const TIMEOUT = 8000;
-        let reconnectTimeout = null;
 
-        // ==================== ELEMENTOS DOM ====================
         const els = {
-            pageLed: document.getElementById('pageLed'),
-            pageStatus: document.getElementById('pageStatus'),
-            espLed: document.getElementById('espLed'),
-            espStatus: document.getElementById('espStatus'),
-            btnEnergia: document.getElementById('btnEnergia'),
-            ledEnergia: document.getElementById('ledEnergia'),
-            txtEnergia: document.getElementById('txtEnergia'),
-            btnAgua: document.getElementById('btnAgua'),
-            ledAgua: document.getElementById('ledAgua'),
-            txtAgua: document.getElementById('txtAgua'),
-            mqttDot: document.getElementById('mqttDot'),
-            mqttStatus: document.getElementById('mqttStatus'),
-            brokerInfo: document.getElementById('brokerInfo'),
-            clientIdDisplay: document.getElementById('clientIdDisplay'),
-            reconnectBtn: document.getElementById('reconnectBtn'),
-            debugLog: document.getElementById('debugLog')
+            pageLed: document.getElementById('pageLed'), pageStatus: document.getElementById('pageStatus'),
+            espLed: document.getElementById('espLed'), espStatus: document.getElementById('espStatus'),
+            btnEnergia: document.getElementById('btnEnergia'), ledEnergia: document.getElementById('ledEnergia'), txtEnergia: document.getElementById('txtEnergia'),
+            btnAgua: document.getElementById('btnAgua'), ledAgua: document.getElementById('ledAgua'), txtAgua: document.getElementById('txtAgua'),
+            mqttDot: document.getElementById('mqttDot'), mqttStatus: document.getElementById('mqttStatus'),
+            brokerInfo: document.getElementById('brokerInfo'), clientIdDisplay: document.getElementById('clientIdDisplay'),
+            reconnectBtn: document.getElementById('reconnectBtn'), debugLog: document.getElementById('debugLog')
         };
 
         els.clientIdDisplay.textContent = MQTT_CONFIG.clientId;
 
-        // ==================== FUNÇÕES DE LOG ====================
         function addLog(message, type = 'info') {
             const entry = document.createElement('div');
             entry.className = `log-entry ${type}`;
-            const time = new Date().toLocaleTimeString();
-            entry.textContent = `[${time}] ${message}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
             els.debugLog.appendChild(entry);
             els.debugLog.scrollTop = els.debugLog.scrollHeight;
             while (els.debugLog.children.length > 30) els.debugLog.removeChild(els.debugLog.firstChild);
         }
 
-        // ==================== FUNÇÕES UI ====================
         function updateDeviceState(device, state) {
             states[device] = state;
-            lastMsgTime[device] = Date.now();
-            
             const btn = els[`btn${device.charAt(0).toUpperCase() + device.slice(1)}`];
             const led = els[`led${device.charAt(0).toUpperCase() + device.slice(1)}`];
             const txt = els[`txt${device.charAt(0).toUpperCase() + device.slice(1)}`];
             
             if (state) {
-                // 🔴 Estado CORTADO (Vermelho)
-                led.classList.remove('off');
-                led.classList.add('on');
+                led.className = 'led-indicator on';
                 txt.textContent = 'CORTADO';
-                txt.classList.remove('off');
-                txt.classList.add('on');
+                txt.className = 'btn-state on';
                 addLog(`⚠️ ${device.toUpperCase()} ativado (Corte)`, 'warning');
             } else {
-                // 🟢 Estado NORMAL (Verde)
-                led.classList.remove('on');
-                led.classList.add('off');
+                led.className = 'led-indicator off';
                 txt.textContent = 'NORMAL';
-                txt.classList.remove('on');
-                txt.classList.add('off');
+                txt.className = 'btn-state off';
                 addLog(`✅ ${device.toUpperCase()} desativado (Normal)`, 'success');
             }
-            
-            els.espLed.className = 'led online';
-            els.espStatus.textContent = 'Online';
-            els.espStatus.className = 'status-text online';
+        }
+
+        function updateESPStatus(isOnline) {
+            if (isOnline) {
+                els.espLed.className = 'led online';
+                els.espStatus.textContent = 'Online';
+                els.espStatus.className = 'status-text online';
+            } else {
+                els.espLed.className = 'led offline';
+                els.espStatus.textContent = 'Desconectado';
+                els.espStatus.className = 'status-text offline';
+            }
         }
 
         function updateMQTTStatus(status, text) {
@@ -604,51 +269,31 @@
                 els.pageLed.className = 'led offline';
                 els.pageStatus.textContent = 'Offline';
                 els.pageStatus.className = 'status-text offline';
-                els.espLed.className = 'led offline';
-                els.espStatus.textContent = 'Desconectado';
-                els.espStatus.className = 'status-text offline';
+                updateESPStatus(false); // Se a página cair, mostra ESP desconectado também
                 els.btnEnergia.disabled = true;
                 els.btnAgua.disabled = true;
                 addLog('⚠️ MQTT Desconectado', 'error');
             }
         }
 
-        // ==================== FUNÇÕES MQTT ====================
         function connectMQTT() {
             updateMQTTStatus('connecting', 'Conectando...');
-            addLog(`🔗 Conectando a ${MQTT_CONFIG.broker}...`, 'info');
-
-            client = mqtt.connect(MQTT_CONFIG.broker, {
-                clientId: MQTT_CONFIG.clientId,
-                clean: true,
-                reconnectPeriod: 3000,
-                connectTimeout: 10000
-            });
+            client = mqtt.connect(MQTT_CONFIG.broker, { clientId: MQTT_CONFIG.clientId, clean: true, reconnectPeriod: 3000, connectTimeout: 10000 });
 
             client.on('connect', () => {
                 updateMQTTStatus('connected', 'Conectado');
+                client.subscribe(MQTT_CONFIG.topics.energia.status, { qos: 1 });
+                client.subscribe(MQTT_CONFIG.topics.agua.status, { qos: 1 });
+                client.subscribe(MQTT_CONFIG.topics.esp, { qos: 1 }); // Inscreve no LWT
                 
-                client.subscribe(MQTT_CONFIG.topics.energia.status, { qos: 1 }, (err) => {
-                    if (!err) addLog(`📡 Inscrito: ${MQTT_CONFIG.topics.energia.status}`, 'info');
-                });
-                client.subscribe(MQTT_CONFIG.topics.agua.status, { qos: 1 }, (err) => {
-                    if (!err) addLog(`📡 Inscrito: ${MQTT_CONFIG.topics.agua.status}`, 'info');
-                });
-
                 setTimeout(() => {
                     client.publish(MQTT_CONFIG.topics.energia.cmd, 'status', { qos: 1 });
                     client.publish(MQTT_CONFIG.topics.agua.cmd, 'status', { qos: 1 });
                 }, 500);
             });
 
-            client.on('reconnect', () => {
-                updateMQTTStatus('connecting', 'Reconectando...');
-            });
-
-            client.on('close', () => {
-                updateMQTTStatus('disconnected', 'Conexão fechada');
-            });
-
+            client.on('reconnect', () => updateMQTTStatus('connecting', 'Reconectando...'));
+            client.on('close', () => updateMQTTStatus('disconnected', 'Conexão fechada'));
             client.on('error', (err) => {
                 addLog(`❌ Erro MQTT: ${err.message}`, 'error');
                 updateMQTTStatus('disconnected', 'Erro de conexão');
@@ -657,73 +302,42 @@
             client.on('message', (topic, message) => {
                 const payload = message.toString().toLowerCase().trim();
                 
-                if (topic === MQTT_CONFIG.topics.energia.status) {
-                    const isOn = payload === 'on' || payload === '1' || payload === 'true' || payload === 'cortado';
-                    updateDeviceState('energia', isOn);
-                } else if (topic === MQTT_CONFIG.topics.agua.status) {
-                    const isOn = payload === 'on' || payload === '1' || payload === 'true' || payload === 'cortado';
-                    updateDeviceState('agua', isOn);
+                if (topic === MQTT_CONFIG.topics.esp) {
+                    // 🚨 AQUI ESTÁ A MÁGICA: Reage instantaneamente ao LWT do broker
+                    updateESPStatus(payload === 'online');
+                }
+                else if (topic === MQTT_CONFIG.topics.energia.status) {
+                    updateDeviceState('energia', payload === 'on' || payload === '1' || payload === 'true' || payload === 'cortado');
+                } 
+                else if (topic === MQTT_CONFIG.topics.agua.status) {
+                    updateDeviceState('agua', payload === 'on' || payload === '1' || payload === 'true' || payload === 'cortado');
                 }
             });
         }
 
         function publishCommand(device, cmd) {
-            if (!client || !client.connected) {
-                addLog('❌ MQTT desconectado', 'error');
-                return;
-            }
-            const topic = MQTT_CONFIG.topics[device].cmd;
-            client.publish(topic, cmd, { qos: 1, retain: false }, (err) => {
-                if (err) {
-                    addLog(`❌ Erro ao publicar em ${topic}`, 'error');
-                } else {
-                    addLog(`📤 Comando enviado: ${cmd} -> ${topic}`, 'info');
-                }
+            if (!client || !client.connected) { addLog('❌ MQTT desconectado', 'error'); return; }
+            client.publish(MQTT_CONFIG.topics[device].cmd, cmd, { qos: 1 }, (err) => {
+                if (err) addLog(`❌ Erro ao publicar`, 'error');
+                else addLog(`📤 Comando enviado: ${cmd}`, 'info');
             });
         }
 
-        // ==================== EVENTOS DOS BOTÕES ====================
-        els.btnEnergia.addEventListener('click', () => {
-            publishCommand('energia', 'toggle');
-        });
-
-        els.btnAgua.addEventListener('click', () => {
-            publishCommand('agua', 'toggle');
-        });
-
+        els.btnEnergia.addEventListener('click', () => publishCommand('energia', 'toggle'));
+        els.btnAgua.addEventListener('click', () => publishCommand('agua', 'toggle'));
         els.reconnectBtn.addEventListener('click', () => {
-            addLog('🔄 Reconexão manual iniciada', 'info');
+            addLog('🔄 Reconexão manual', 'info');
             if (client) client.end(true);
             connectMQTT();
         });
 
-        // ==================== MONITORAMENTO DE TIMEOUT ====================
-        setInterval(() => {
-            const now = Date.now();
-            let anyOnline = false;
-            
-            if (now - lastMsgTime.energia < TIMEOUT) anyOnline = true;
-            if (now - lastMsgTime.agua < TIMEOUT) anyOnline = true;
-
-            if (!anyOnline && isConnected) {
-                els.espLed.className = 'led offline';
-                els.espStatus.textContent = 'Sem resposta';
-                els.espStatus.className = 'status-text offline';
-            }
-        }, 1500);
-
-        // ==================== INICIALIZAÇÃO ====================
         function init() {
             addLog('🚀 Iniciando Painel de Controle...', 'info');
-            addLog(`📡 Broker: ${MQTT_CONFIG.broker}`, 'info');
             connectMQTT();
         }
-
         init();
 
-        window.addEventListener('beforeunload', () => {
-            if (client) client.end(true);
-        });
+        window.addEventListener('beforeunload', () => { if (client) client.end(true); });
     </script>
 </body>
 </html>
