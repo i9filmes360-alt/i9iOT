@@ -1,367 +1,580 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Controle Relé | Smart Dashboard</title>
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle - Cortes</title>
     
-    body {
-      font-family: 'Plus Jakarta Sans', sans-serif;
-      background: #090d16;
-      background-image: 
-        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.12) 0px, transparent 50%);
-      color: #f1f5f9;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
+    <!-- Bibliotecas Externas -->
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    .card {
-      background: rgba(15, 23, 42, 0.75);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 28px;
-      padding: 36px 28px;
-      width: 100%;
-      max-width: 360px;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-    }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: #e2e8f0;
+        }
 
-    /* Borda superior iluminada */
-    .card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.5), transparent);
-    }
+        .container {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 30px;
+            width: 100%;
+            max-width: 600px; /* Aumentado para acomodar 2 botões */
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
 
-    .header {
-      margin-bottom: 24px;
-    }
+        h1 {
+            text-align: center;
+            color: #38bdf8;
+            font-size: 22px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
 
-    .header h1 {
-      font-size: 1.25rem;
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      color: #f8fafc;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-    }
+        h1 .subtitle {
+            font-size: 13px;
+            color: #94a3b8;
+            font-weight: normal;
+            background: rgba(56, 189, 248, 0.1);
+            padding: 4px 10px;
+            border-radius: 12px;
+        }
 
-    .header h1 i {
-      color: #38bdf8;
-    }
+        /* Status Grid (Web e ESP32) */
+        .status-container {
+            display: flex;
+            justify-content: space-around;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
 
-    /* Redes e Conexões (LEDs) */
-    .status-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin-bottom: 28px;
-    }
+        .status-item {
+            flex: 1;
+            text-align: center;
+            padding: 12px 10px;
+            background: rgba(15, 23, 42, 0.6);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
 
-    .status-item {
-      background: rgba(30, 41, 59, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.03);
-      border-radius: 16px;
-      padding: 12px 10px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-    }
+        .status-item .label {
+            display: block;
+            font-size: 11px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
 
-    .status-item span {
-      font-size: 0.65rem;
-      font-weight: 600;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
+        .led {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin: 0 auto 8px;
+            transition: all 0.5s ease;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
 
-    .led-wrapper {
-      position: relative;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+        .led.online { background: #22c55e; box-shadow: 0 0 20px #22c55e, inset 0 0 15px rgba(34, 197, 94, 0.3); border-color: #22c55e; }
+        .led.offline { background: #ef4444; box-shadow: 0 0 20px #ef4444, inset 0 0 15px rgba(239, 68, 68, 0.3); border-color: #ef4444; }
+        .led.connecting { background: #eab308; box-shadow: 0 0 20px #eab308; border-color: #eab308; animation: pulse 1s infinite; }
 
-    .led {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #334155;
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+        }
 
-    .led.on {
-      background: #10b981;
-      box-shadow: 0 0 12px #10b981, 0 0 24px rgba(16, 185, 129, 0.4);
-    }
+        .status-text { font-size: 12px; color: #94a3b8; }
+        .status-text.online { color: #22c55e; }
+        .status-text.offline { color: #ef4444; }
+        .status-text.connecting { color: #eab308; }
 
-    .led.off {
-      background: #ef4444;
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
-    }
+        /* Grid de Botões */
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 25px 0;
+        }
 
-    /* Mostrador de Estado */
-    .estado-container {
-      margin-bottom: 28px;
-    }
+        .rele-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
 
-    .estado-badge {
-      display: inline-block;
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      background: rgba(51, 65, 85, 0.4);
-      color: #94a3b8;
-      border: 1px solid rgba(255, 255, 255, 0.05);
-      transition: all 0.3s;
-    }
+        .rele-btn {
+            width: 100%;
+            max-width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            border: none;
+            background: linear-gradient(145deg, #1a2a4a, #0a1525);
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            position: relative;
+        }
 
-    .estado-badge.on {
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border-color: rgba(16, 185, 129, 0.3);
-    }
+        .rele-btn:active {
+            transform: scale(0.92);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
 
-    .estado-badge.off {
-      background: rgba(239, 68, 68, 0.15);
-      color: #f87171;
-      border-color: rgba(239, 68, 68, 0.3);
-    }
+        .rele-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
 
-    /* Botão Principal Cyberpunk */
-    .btn-container {
-      position: relative;
-      width: 140px;
-      height: 140px;
-      margin: 0 auto 28px;
-    }
+        .rele-btn .led-indicator {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            transition: all 0.4s ease;
+            background: #1a2a3a;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
 
-    .btn-rele {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      border: none;
-      cursor: pointer;
-      outline: none;
-      background: #1e293b;
-      color: #64748b;
-      font-size: 2rem;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.05), 0 10px 25px rgba(0,0,0,0.5);
-      border: 2px solid rgba(255,255,255,0.05);
-    }
+        .rele-btn .led-indicator.on {
+            background: #f23e31; /* Laranja para estado ATIVO/CORTADO */
+            box-shadow: 0 0 40px #f97316, inset 0 0 15px rgba(249, 115, 22, 0.3);
+        }
 
-    .btn-rele:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-      filter: grayscale(100%);
-    }
+        .rele-btn .led-indicator.off {
+            background: #097adc;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
 
-    .btn-rele.ligado {
-      background: radial-gradient(circle, #10b981 0%, #047857 100%);
-      color: #ffffff;
-      box-shadow: 0 0 35px rgba(16, 185, 129, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.3);
-      border-color: #34d399;
-    }
+        .rele-btn .btn-icon {
+            font-size: 28px;
+            margin-bottom: 4px;
+        }
 
-    .btn-rele.desligado {
-      background: linear-gradient(145deg, #1e293b, #0f172a);
-      color: #475569;
-    }
+        .rele-btn .btn-state {
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
 
-    .btn-rele:hover:not(:disabled) {
-      transform: scale(1.05);
-    }
+        .rele-btn .btn-state.on { color: #f97316; }
+        .rele-btn .btn-state.off { color: #475569; }
 
-    .btn-rele.ligado:hover:not(:disabled) {
-      box-shadow: 0 0 45px rgba(16, 185, 129, 0.7), inset 0 2px 4px rgba(255, 255, 255, 0.4);
-    }
+        .rele-hint {
+            color: #64748b;
+            font-size: 10px;
+            margin-top: 10px;
+            text-align: center;
+        }
 
-    .btn-rele:active:not(:disabled) {
-      transform: scale(0.95);
-    }
+        /* Barra de Informações */
+        .info-bar {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 11px;
+            color: #64748b;
+            background: rgba(15, 23, 42, 0.4);
+            border-radius: 12px;
+        }
 
-    /* Painel de Informações */
-    .info {
-      background: rgba(15, 23, 42, 0.6);
-      border-radius: 12px;
-      padding: 12px;
-      font-size: 0.7rem;
-      color: #64748b;
-      text-align: left;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      border: 1px solid rgba(255,255,255,0.02);
-    }
+        .info-bar .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-    .info-item {
-      display: flex;
-      justify-content: space-between;
-    }
+        .info-bar .mqtt-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-    .info-item code {
-      color: #38bdf8;
-      font-family: monospace;
-    }
-  </style>
+        .info-bar .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .info-bar .dot.green { background: #22c55e; }
+        .info-bar .dot.yellow { background: #eab308; }
+        .info-bar .dot.red { background: #ef4444; }
+
+        .info-bar code {
+            font-family: monospace;
+            background: rgba(255,255,255,0.05);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+        }
+
+        .reconnect-btn {
+            background: transparent;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .reconnect-btn:hover { background: #334155; color: #f8fafc; }
+
+        .debug-log {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 15px;
+            max-height: 90px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 10px;
+            color: #64748b;
+        }
+
+        .debug-log .log-entry {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+        }
+        .debug-log .log-entry.success { color: #22c55e; }
+        .debug-log .log-entry.error { color: #ef4444; }
+        .debug-log .log-entry.info { color: #38bdf8; }
+        .debug-log .log-entry.warning { color: #eab308; }
+
+        @media (max-width: 480px) {
+            .container { padding: 20px; }
+            .buttons-grid { grid-template-columns: 1fr; gap: 25px; }
+            .rele-btn { max-width: 180px; height: 180px; margin: 0 auto; }
+        }
+    </style>
 </head>
 <body>
+    <div class="container">
+        <h1>
+            <i class="fa-solid fa-sliders"></i> Painel de Controle
+            <span class="subtitle">MQTT</span>
+        </h1>
 
-  <div class="card">
-    <div class="header">
-      <h1><i class="fa-solid fa-bolt"></i> Painel de Controle</h1>
-    </div>
-
-    <div class="status-row">
-      <div class="status-item">
-        <span>Web ↔ MQTT</span>
-        <div class="led-wrapper">
-          <div id="ledPage" class="led off"></div>
+        <div class="status-container">
+            <div class="status-item">
+                <span class="label"><i class="fa-solid fa-globe"></i> Página Web</span>
+                <div class="led connecting" id="pageLed"></div>
+                <span class="status-text connecting" id="pageStatus">Conectando...</span>
+            </div>
+            <div class="status-item">
+                <span class="label"><i class="fa-solid fa-microchip"></i> ESP32</span>
+                <div class="led offline" id="espLed"></div>
+                <span class="status-text offline" id="espStatus">Aguardando...</span>
+            </div>
         </div>
-      </div>
-      <div class="status-item">
-        <span>ESP32 ↔ MQTT</span>
-        <div class="led-wrapper">
-          <div id="ledEsp" class="led off"></div>
+
+        <div class="buttons-grid">
+            <!-- Botão 1: Corte Energia -->
+            <div class="rele-container">
+                <button class="rele-btn" id="btnEnergia" disabled>
+                    <div class="led-indicator off" id="ledEnergia"></div>
+                    <div class="btn-icon">⚡</div>
+                    <div>CORTE ENERGIA</div>
+                    <div class="btn-state off" id="txtEnergia">DESATIVADO</div>
+                </button>
+                <div class="rele-hint">Pressione para alternar</div>
+            </div>
+
+            <!-- Botão 2: Corte Água -->
+            <div class="rele-container">
+                <button class="rele-btn" id="btnAgua" disabled>
+                    <div class="led-indicator off" id="ledAgua"></div>
+                    <div class="btn-icon">💧</div>
+                    <div>CORTE ÁGUA</div>
+                    <div class="btn-state off" id="txtAgua">DESATIVADO</div>
+                </button>
+                <div class="rele-hint">Pressione para alternar</div>
+            </div>
         </div>
-      </div>
+
+        <div class="info-bar">
+            <div class="row">
+                <div class="mqtt-info">
+                    <span class="dot yellow" id="mqttDot"></span>
+                    <span id="mqttStatus">Conectando ao broker...</span>
+                </div>
+                <button class="reconnect-btn" id="reconnectBtn">Reconectar</button>
+            </div>
+            <div class="row">
+                <span>Broker</span>
+                <code id="brokerInfo">broker.emqx.io:8084</code>
+            </div>
+            <div class="row">
+                <span>Client ID</span>
+                <code id="clientIdDisplay">web_xxxxxx</code>
+            </div>
+        </div>
+
+        <div class="debug-log" id="debugLog">
+            <div class="log-entry info">🔄 Inicializando sistema...</div>
+        </div>
     </div>
 
-    <div class="estado-container">
-      <span id="txtEstado" class="estado-badge off">Aguardando...</span>
-    </div>
+    <script>
+        // ==================== CONFIGURAÇÃO MQTT ====================
+        const MQTT_CONFIG = {
+            broker: 'wss://broker.emqx.io:8084/mqtt', // WebSocket seguro (TLS)
+            clientId: `web_${Math.random().toString(16).substr(2, 8)}`,
+            topics: {
+                energia: { cmd: 'casa/energia/cmd', status: 'casa/energia/status' },
+                agua:    { cmd: 'casa/agua/cmd',    status: 'casa/agua/status' }
+            }
+        };
 
-    <div class="btn-container">
-      <button id="btnRele" class="btn-rele desligado" disabled aria-label="Alternar Relé">
-        <i class="fa-solid fa-power-off"></i>
-      </button>
-    </div>
+        // ==================== ESTADO ====================
+        let client = null;
+        let isConnected = false;
+        let states = { energia: false, agua: false };
+        let lastMsgTime = { energia: 0, agua: 0 };
+        const TIMEOUT = 8000; // 8 segundos sem mensagem = offline
+        let reconnectTimeout = null;
 
-    <div class="info">
-      <div class="info-item"><span>Broker:</span> <code>broker.emqx.io</code></div>
-      <div class="info-item"><span>Cmd:</span> <code>casa/rele/cmd</code></div>
-      <div class="info-item"><span>Status:</span> <code>casa/rele/status</code></div>
-    </div>
-  </div>
+        // ==================== ELEMENTOS DOM ====================
+        const els = {
+            pageLed: document.getElementById('pageLed'),
+            pageStatus: document.getElementById('pageStatus'),
+            espLed: document.getElementById('espLed'),
+            espStatus: document.getElementById('espStatus'),
+            btnEnergia: document.getElementById('btnEnergia'),
+            ledEnergia: document.getElementById('ledEnergia'),
+            txtEnergia: document.getElementById('txtEnergia'),
+            btnAgua: document.getElementById('btnAgua'),
+            ledAgua: document.getElementById('ledAgua'),
+            txtAgua: document.getElementById('txtAgua'),
+            mqttDot: document.getElementById('mqttDot'),
+            mqttStatus: document.getElementById('mqttStatus'),
+            brokerInfo: document.getElementById('brokerInfo'),
+            clientIdDisplay: document.getElementById('clientIdDisplay'),
+            reconnectBtn: document.getElementById('reconnectBtn'),
+            debugLog: document.getElementById('debugLog')
+        };
 
-  <script>
-    const BROKER       = "wss://broker.emqx.io:8084/mqtt";
-    const TOPIC_STATUS = "casa/rele/status";
-    const TOPIC_CMD    = "casa/rele/cmd";
-    const CLIENT_ID    = "web_rele_" + Math.random().toString(16).substr(2, 8);
+        els.clientIdDisplay.textContent = MQTT_CONFIG.clientId;
 
-    let client = null;
-    let estado = false;
-    let ultimaMsg = 0;
-    const TIMEOUT = 8000;
-
-    const ledPage   = document.getElementById("ledPage");
-    const ledEsp    = document.getElementById("ledEsp");
-    const btnRele   = document.getElementById("btnRele");
-    const txtEstado = document.getElementById("txtEstado");
-
-    function atualizarBotao() {
-      if (estado) {
-        btnRele.classList.remove("desligado");
-        btnRele.classList.add("ligado");
-        
-        txtEstado.textContent = "SISTEMA LIGADO";
-        txtEstado.classList.remove("off");
-        txtEstado.classList.add("on");
-      } else {
-        btnRele.classList.remove("ligado");
-        btnRele.classList.add("desligado");
-        
-        txtEstado.textContent = "SISTEMA DESLIGADO";
-        txtEstado.classList.remove("on");
-        txtEstado.classList.add("off");
-      }
-    }
-
-    function conectar() {
-      client = mqtt.connect(BROKER, {
-        clientId: CLIENT_ID,
-        clean: true,
-        reconnectPeriod: 3000
-      });
-
-      client.on("connect", () => {
-        ledPage.classList.remove("off");
-        ledPage.classList.add("on");
-        client.subscribe(TOPIC_STATUS);
-        btnRele.disabled = false;
-      });
-
-      client.on("reconnect", () => {
-        ledPage.classList.remove("on");
-        ledPage.classList.add("off");
-        btnRele.disabled = true;
-      });
-
-      client.on("close", () => {
-        ledPage.classList.remove("on");
-        ledPage.classList.add("off");
-        btnRele.disabled = true;
-      });
-
-      client.on("error", (err) => {
-        console.error("Erro MQTT:", err);
-      });
-
-      client.on("message", (topic, message) => {
-        if (topic === TOPIC_STATUS) {
-          ultimaMsg = Date.now();
-          ledEsp.classList.remove("off");
-          ledEsp.classList.add("on");
-
-          const payload = message.toString().toLowerCase().trim();
-          estado = (payload === "on" || payload === "1" || payload === "true");
-
-          atualizarBotao();
+        // ==================== FUNÇÕES DE LOG ====================
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] ${message}`;
+            els.debugLog.appendChild(entry);
+            els.debugLog.scrollTop = els.debugLog.scrollHeight;
+            while (els.debugLog.children.length > 30) els.debugLog.removeChild(els.debugLog.firstChild);
         }
-      });
-    }
 
-    setInterval(() => {
-      if (Date.now() - ultimaMsg > TIMEOUT) {
-        ledEsp.classList.remove("on");
-        ledEsp.classList.add("off");
-      }
-    }, 1500);
+        // ==================== FUNÇÕES UI ====================
+        function updateDeviceState(device, state) {
+            states[device] = state;
+            lastMsgTime[device] = Date.now();
+            
+            const btn = els[`btn${device.charAt(0).toUpperCase() + device.slice(1)}`];
+            const led = els[`led${device.charAt(0).toUpperCase() + device.slice(1)}`];
+            const txt = els[`txt${device.charAt(0).toUpperCase() + device.slice(1)}`];
+            
+            if (state) {
+                led.classList.remove('off');
+                led.classList.add('on');
+                txt.textContent = 'CORTADO';
+                txt.classList.remove('off');
+                txt.classList.add('on');
+                addLog(`⚠️ ${device.toUpperCase()} ativado (Corte)`, 'warning');
+            } else {
+                led.classList.remove('on');
+                led.classList.add('off');
+                txt.textContent = 'NORMAL';
+                txt.classList.remove('on');
+                txt.classList.add('off');
+                addLog(`✅ ${device.toUpperCase()} desativado (Normal)`, 'success');
+            }
+            
+            // Atualiza status geral do ESP32 se receber mensagem
+            els.espLed.className = 'led online';
+            els.espStatus.textContent = 'Online';
+            els.espStatus.className = 'status-text online';
+        }
 
-    btnRele.addEventListener("click", () => {
-      if (!client || !client.connected) return;
-      client.publish(TOPIC_CMD, "toggle");
-    });
+        function updateMQTTStatus(status, text) {
+            if (status === 'connected') {
+                els.mqttDot.className = 'dot green';
+                els.mqttStatus.textContent = text || 'Conectado';
+                els.pageLed.className = 'led online';
+                els.pageStatus.textContent = 'Online';
+                els.pageStatus.className = 'status-text online';
+                els.btnEnergia.disabled = false;
+                els.btnAgua.disabled = false;
+                addLog('📡 MQTT Conectado com sucesso', 'success');
+            } else if (status === 'connecting') {
+                els.mqttDot.className = 'dot yellow';
+                els.mqttStatus.textContent = text || 'Conectando...';
+                els.pageLed.className = 'led connecting';
+                els.pageStatus.textContent = 'Conectando...';
+                els.pageStatus.className = 'status-text connecting';
+                els.btnEnergia.disabled = true;
+                els.btnAgua.disabled = true;
+            } else {
+                els.mqttDot.className = 'dot red';
+                els.mqttStatus.textContent = text || 'Desconectado';
+                els.pageLed.className = 'led offline';
+                els.pageStatus.textContent = 'Offline';
+                els.pageStatus.className = 'status-text offline';
+                els.espLed.className = 'led offline';
+                els.espStatus.textContent = 'Desconectado';
+                els.espStatus.className = 'status-text offline';
+                els.btnEnergia.disabled = true;
+                els.btnAgua.disabled = true;
+                addLog('⚠️ MQTT Desconectado', 'error');
+            }
+        }
 
-    conectar();
-    atualizarBotao();
-  </script>
+        // ==================== FUNÇÕES MQTT ====================
+        function connectMQTT() {
+            updateMQTTStatus('connecting', 'Conectando...');
+            addLog(`🔗 Conectando a ${MQTT_CONFIG.broker}...`, 'info');
+
+            client = mqtt.connect(MQTT_CONFIG.broker, {
+                clientId: MQTT_CONFIG.clientId,
+                clean: true,
+                reconnectPeriod: 3000,
+                connectTimeout: 10000
+            });
+
+            client.on('connect', () => {
+                updateMQTTStatus('connected', 'Conectado');
+                
+                // Inscreve nos tópicos de status
+                client.subscribe(MQTT_CONFIG.topics.energia.status, { qos: 1 }, (err) => {
+                    if (!err) addLog(`📡 Inscrito: ${MQTT_CONFIG.topics.energia.status}`, 'info');
+                });
+                client.subscribe(MQTT_CONFIG.topics.agua.status, { qos: 1 }, (err) => {
+                    if (!err) addLog(`📡 Inscrito: ${MQTT_CONFIG.topics.agua.status}`, 'info');
+                });
+
+                // Solicita status inicial
+                setTimeout(() => {
+                    client.publish(MQTT_CONFIG.topics.energia.cmd, 'status', { qos: 1 });
+                    client.publish(MQTT_CONFIG.topics.agua.cmd, 'status', { qos: 1 });
+                }, 500);
+            });
+
+            client.on('reconnect', () => {
+                updateMQTTStatus('connecting', 'Reconectando...');
+            });
+
+            client.on('close', () => {
+                updateMQTTStatus('disconnected', 'Conexão fechada');
+            });
+
+            client.on('error', (err) => {
+                addLog(`❌ Erro MQTT: ${err.message}`, 'error');
+                updateMQTTStatus('disconnected', 'Erro de conexão');
+            });
+
+            client.on('message', (topic, message) => {
+                const payload = message.toString().toLowerCase().trim();
+                
+                if (topic === MQTT_CONFIG.topics.energia.status) {
+                    const isOn = payload === 'on' || payload === '1' || payload === 'true' || payload === 'cortado';
+                    updateDeviceState('energia', isOn);
+                } else if (topic === MQTT_CONFIG.topics.agua.status) {
+                    const isOn = payload === 'on' || payload === '1' || payload === 'true' || payload === 'cortado';
+                    updateDeviceState('agua', isOn);
+                }
+            });
+        }
+
+        function publishCommand(device, cmd) {
+            if (!client || !client.connected) {
+                addLog('❌ MQTT desconectado', 'error');
+                return;
+            }
+            const topic = MQTT_CONFIG.topics[device].cmd;
+            client.publish(topic, cmd, { qos: 1, retain: false }, (err) => {
+                if (err) {
+                    addLog(`❌ Erro ao publicar em ${topic}`, 'error');
+                } else {
+                    addLog(`📤 Comando enviado: ${cmd} -> ${topic}`, 'info');
+                }
+            });
+        }
+
+        // ==================== EVENTOS DOS BOTÕES ====================
+        els.btnEnergia.addEventListener('click', () => {
+            publishCommand('energia', 'toggle');
+        });
+
+        els.btnAgua.addEventListener('click', () => {
+            publishCommand('agua', 'toggle');
+        });
+
+        els.reconnectBtn.addEventListener('click', () => {
+            addLog('🔄 Reconexão manual iniciada', 'info');
+            if (client) client.end(true);
+            connectMQTT();
+        });
+
+        // ==================== MONITORAMENTO DE TIMEOUT ====================
+        setInterval(() => {
+            const now = Date.now();
+            let anyOnline = false;
+            
+            if (now - lastMsgTime.energia < TIMEOUT) anyOnline = true;
+            if (now - lastMsgTime.agua < TIMEOUT) anyOnline = true;
+
+            if (!anyOnline && isConnected) {
+                els.espLed.className = 'led offline';
+                els.espStatus.textContent = 'Sem resposta';
+                els.espStatus.className = 'status-text offline';
+            }
+        }, 1500);
+
+        // ==================== INICIALIZAÇÃO ====================
+        function init() {
+            addLog('🚀 Iniciando Painel de Controle...', 'info');
+            addLog(`📡 Broker: ${MQTT_CONFIG.broker}`, 'info');
+            connectMQTT();
+        }
+
+        init();
+
+        window.addEventListener('beforeunload', () => {
+            if (client) client.end(true);
+        });
+    </script>
 </body>
 </html>
