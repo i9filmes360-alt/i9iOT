@@ -225,12 +225,12 @@
                 led.className = 'led-indicator on';
                 txt.textContent = 'CORTADO';
                 txt.className = 'btn-state on';
-                addLog(`⚠️ ${device.toUpperCase()} ativado (Corte)`, 'warning');
+                addLog(`⚠️ ${device.toUpperCase()} Corte (Ativado)`, 'warning');
             } else {
                 led.className = 'led-indicator off';
                 txt.textContent = 'NORMAL';
                 txt.className = 'btn-state off';
-                addLog(`✅ ${device.toUpperCase()} desativado (Corte)`, 'success');
+                addLog(`✅ ${device.toUpperCase()} Corte (Desativado)`, 'success');
             }
         }
 
@@ -322,7 +322,7 @@
             if (!client || !client.connected) { addLog('❌ MQTT desconectado', 'error'); return; }
             client.publish(MQTT_CONFIG.topics[device].cmd, cmd, { qos: 1 }, (err) => {
                 if (err) addLog(`❌ Erro ao publicar`, 'error');
-                else addLog(`📤 Comando enviado: ${cmd}`, 'info');
+                else addLog;
             });
         }
 
