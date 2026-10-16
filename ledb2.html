@@ -1,577 +1,809 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LabVIEW Style · Relay Control</title>
-  
-  <!-- ============================================================
-       BIBLIOTECAS EXTERNAS
-       ============================================================ -->
-  <!-- MQTT: Cliente para comunicação com o broker -->
-  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
-  <!-- Font Awesome: Ícones -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <style>
-    /* ================================================================
-       FONTES
-       ================================================================ */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:opsz@14..32&display=swap');
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WELLCON - MUDLOGGING WIRELESS</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #1E1E1E;
+            --card-color: #2B2B2B;
+            --btn-color: #0445dc;
+            --text-color: #FFFFFF;
+            --footer-color: #2B2B2B;
+            --logo-color: #00AEEF;
+        }
 
-    /* ================================================================
-       RESET - Remove margens e padding padrão do navegador
-       ================================================================ */
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    /* ================================================================
-       CORPO DA PÁGINA (BACKGROUND)
-       - Fundo escuro com gradiente para destacar o painel
-       ================================================================ */
-    body {
-      background: #0b1219;                    /* Cor sólida de fallback */
-      background: radial-gradient(ellipse at 30% 40%, #050505, #070e14); /* Gradiente escuro */
-      min-height: 100vh;                     /* Altura mínima = 100% da tela */
-      display: flex;                         /* Centraliza o conteúdo */
-      align-items: center;
-      justify-content: center;
-      font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-      padding: 20px;                         /* Espaçamento nas bordas */
-    }
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
-    /* ================================================================
-       PAINEL PRINCIPAL (CARD)
-       - Estilo "front panel" do LabVIEW com cores claras
-       ================================================================ */
-    .lv-panel {
-      background: #eaf1f9;                   /* Cor sólida de fallback */
-      background: linear-gradient(165deg, #f0f6fc, #d8e6f2); /* Gradiente claro */
-      border-radius: 28px;                   /* Bordas arredondadas */
-      padding: 28px 26px 26px;               /* Espaçamento interno */
-      max-width: 420px;                      /* Largura máxima */
-      width: 100%;                           /* Largura responsiva */
-      
-      /* Sombras para efeito 3D */
-      box-shadow: 
-        0 16px 40px rgba(0, 20, 40, 0.4),   /* Sombra externa */
-        inset 0 2px 0 rgba(255,255,255,0.7), /* Brilho interno superior */
-        inset 0 -4px 8px rgba(0,0,0,0.08);   /* Sombra interna inferior */
-      
-      border: 1px solid #b8cfe0;             /* Borda */
-      border-top-color: #d6e8f5;             /* Borda superior mais clara */
-      transition: all 0.2s;                  /* Transição suave */
-    }
+        header {
+            background-color: var(--footer-color);
+            padding: 10px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--btn-color);
+            flex-wrap: wrap;
+        }
+        .logo { font-size: 1.2rem; font-weight: bold; color: var(--logo-color); }
+        .logo span {
+            color: var(--text-color);
+            font-size: 0.7rem;
+            margin-left: 8px;
+            font-weight: normal;
+            display: block;
+            margin-top: 2px;
+        }
+        .status-bar { text-align: right; font-size: 0.8rem; }
+        .status-indicator {
+            display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+            background-color: #ff0000; margin-right: 5px; vertical-align: middle;
+        }
+        .status-indicator.connected { background-color: #00FF00; box-shadow: 0 0 6px #00FF00; }
+        .clock { font-size: 1rem; font-weight: bold; margin-top: 3px; }
 
-    /* ================================================================
-       CABEÇALHO
-       ================================================================ */
-    .lv-header {
-      display: flex;                         /* Alinha itens em linha */
-      align-items: center;
-      justify-content: space-between;        /* Espaço entre título e badge */
-      margin-bottom: 22px;                   /* Espaço inferior */
-      padding-bottom: 10px;                  /* Espaço interno inferior */
-      border-bottom: 2px solid #b0c8dc;      /* Linha divisória */
-    }
+        main { flex: 1; padding: 15px; overflow-y: auto; }
+        .view { display: none; animation: fadeIn 0.3s; }
+        .view.active { display: flex; flex-direction: column; align-items: center; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
-    .lv-header h2 {
-      font-weight: 600;                      /* Peso da fonte */
-      font-size: 1.1rem;                     /* Tamanho da fonte */
-      letter-spacing: 0.02em;                /* Espaçamento entre letras */
-      color: #1a4a6b;                        /* Cor do texto */
-      text-shadow: 0 1px 0 rgba(255,255,255,0.5); /* Sombra do texto */
-      display: flex;
-      align-items: center;
-      gap: 10px;                             /* Espaço entre ícone e texto */
-    }
+        /* MENU GRID */
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 20px;
+        }
+        .menu-btn {
+            background-color: var(--btn-color);
+            color: white;
+            border: 3px solid #0336b0;
+            padding: 30px 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, background 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            min-height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .menu-btn:hover { background-color: #0336b0; transform: translateY(-2px); }
+        .menu-btn:active { transform: translateY(0); }
+        .menu-btn.main-action {
+            background-color: #E74C3C;
+            border-color: #c0392b;
+            grid-column: span 2;
+        }
+        .menu-btn.main-action:hover { background-color: #c0392b; }
 
-    .lv-header h2 i {
-      color: #1a6b9e;                        /* Cor do ícone */
-      font-size: 1.2rem;                     /* Tamanho do ícone */
-    }
+        /* CARDS */
+        .card {
+            background-color: var(--card-color);
+            border: 2px solid #444;
+            padding: 15px;
+            text-align: center;
+            width: 100%;
+            max-width: 600px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+        }
+        .card-title { font-size: 1.2rem; margin-bottom: 10px; font-weight: bold; }
+        .value-display {
+            font-size: 2.5rem;
+            font-weight: bold;
+            background: #1A1A1A;
+            padding: 10px;
+            border: 2px solid #444;
+            min-width: 100px;
+            display: inline-block;
+            margin: 8px 0;
+        }
+        .sub-value { font-size: 0.9rem; color: #888; margin-top: 5px; font-weight: bold; }
 
-    /* Badge (etiqueta) do cabeçalho */
-    .lv-badge {
-      background: #d4e4f0;                   /* Fundo */
-      padding: 4px 14px 4px 12px;            /* Espaçamento interno */
-      border-radius: 30px;                   /* Bordas arredondadas */
-      font-size: 0.6rem;                     /* Tamanho da fonte */
-      font-weight: 600;                      /* Peso da fonte */
-      color: #1a5276;                        /* Cor do texto */
-      border: 1px solid #a8c0d4;             /* Borda */
-      box-shadow: inset 0 1px 3px rgba(0,0,0,0.05), 0 1px 0 rgba(255,255,255,0.6);
-      letter-spacing: 0.04em;                /* Espaçamento entre letras */
-    }
+        .config-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 10px 0;
+        }
+        .config-row label { color: var(--text-color); font-size: 0.9rem; font-weight: bold; }
+        .config-row input {
+            background: #1A1A1A;
+            border: 1px solid #444;
+            color: var(--text-color);
+            padding: 5px 8px;
+            font-size: 0.9rem;
+            width: 70px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .config-row input:focus { outline: none; border-color: var(--btn-color); }
 
-    .lv-badge i {
-      margin-right: 6px;                     /* Espaço entre ícone e texto */
-      color: #1a6b9e;
-    }
+        .action-btn {
+            background-color: #FFC107;
+            color: #000;
+            border: 2px solid #e0a800;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 6px 4px;
+            min-width: 100px;
+            transition: all 0.2s;
+        }
+        .action-btn:hover { background-color: #e0a800; }
+        .action-btn:active { transform: scale(0.95); }
+        .action-btn.sent {
+            background-color: #28a745 !important;
+            border-color: #218838 !important;
+            color: white !important;
+        }
+        .back-btn {
+            background-color: var(--btn-color);
+            color: white;
+            border: 2px solid #0336b0;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 12px;
+            width: 100%;
+            max-width: 280px;
+        }
 
-    /* ================================================================
-       GRID DE STATUS (LEDs)
-       - 2 colunas: Web e ESP32
-       ================================================================ */
-    .lv-status-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;        /* 2 colunas iguais */
-      gap: 12px;                             /* Espaço entre os itens */
-      margin-bottom: 24px;                   /* Espaço inferior */
-    }
+        .vu-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            height: 150px;
+            width: 30px;
+            background: #1A1A1A;
+            border: 1px solid #444;
+            padding: 8px 4px;
+            margin: 15px auto;
+            position: relative;
+        }
+        .vu-bar {
+            width: 100%;
+            background: #00FF00;
+            transition: height 0.3s ease-out, background 0.3s;
+            height: 0%;
+        }
+        .vu-label {
+            position: absolute;
+            top: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            color: #888;
+        }
+        .vu-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            font-size: 0.9rem;
+            text-shadow: 0 0 3px #000;
+        }
 
-    /* Cada item do status */
-    .lv-status-item {
-      background: #dce8f2;
-      background: linear-gradient(180deg, #e6f0f8, #d0dce8);
-      border-radius: 14px;
-      padding: 12px 6px;                     /* Espaçamento interno */
-      border: 1px solid #b6cada;
-      box-shadow: inset 0 2px 4px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.7);
-      display: flex;
-      flex-direction: column;                /* Empilha verticalmente */
-      align-items: center;
-      gap: 6px;                              /* Espaço entre label e LED */
-    }
+        .progress-container {
+            width: 100%;
+            max-width: 400px;
+            height: 18px;
+            background: #1A1A1A;
+            border: 1px solid #444;
+            margin: 10px auto;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #00FF00;
+            transition: width 0.3s ease-out;
+            width: 0%;
+        }
 
-    .lv-status-item .label {
-      font-size: 0.6rem;
-      font-weight: 600;
-      text-transform: uppercase;             /* Tudo maiúsculo */
-      letter-spacing: 0.06em;
-      color: #2a5f7a;
-    }
+        .bombas-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            width: 100%;
+        }
+        .bomba-card {
+            background: var(--card-color);
+            border: 2px solid #444;
+            padding: 10px 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .bomba-title { font-size: 1rem; font-weight: bold; margin-bottom: 5px; }
+        .bomba-ppm-label { font-size: 0.8rem; color: #888; font-weight: bold; }
+        .bomba-ppm {
+            font-size: 2.2rem;
+            font-weight: bold;
+            background: #1A1A1A;
+            border: 2px solid #444;
+            padding: 5px 10px;
+            color: #00FF00;
+            min-width: 80px;
+            margin: 5px 0;
+        }
+        .bomba-cont-label { font-size: 0.7rem; color: #888; font-weight: bold; margin-top: 5px; }
+        .bomba-cont {
+            font-size: 1.3rem;
+            font-weight: bold;
+            background: #1A1A1A;
+            border: 2px solid #444;
+            padding: 3px 8px;
+            color: #FFFFFF;
+            min-width: 70px;
+            margin: 3px 0;
+        }
+        .bomba-btn {
+            background-color: #FFC107;
+            color: #000;
+            border: 2px solid #e0a800;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 8px;
+            width: 100%;
+            max-width: 90px;
+            transition: all 0.2s;
+        }
+        .bomba-btn:active { transform: scale(0.95); }
+        .bomba-btn.sent {
+            background-color: #28a745 !important;
+            border-color: #218838 !important;
+            color: white !important;
+        }
 
-    /* ================================================================
-       LEDS DE STATUS
-       - Estados: on (verde/azul), off (vermelho), wait (cinza)
-       ================================================================ */
-    .lv-led {
-      width: 20px;                           /* Largura */
-      height: 20px;                          /* Altura (quadrado perfeito) */
-      border-radius: 50%;                    /* Círculo perfeito */
-      background: #b8ccdc;                   /* Cor padrão (desligado) */
-      box-shadow: inset 0 2px 6px rgba(0,0,0,0.15), 0 0 0 1px #a0b8cc;
-      transition: 0.15s;                     /* Transição suave ao mudar estado */
-    }
+        .dual-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+        }
 
-    .lv-led.on {                             /* LED ligado (azul) */
-      background: #4fc3f7;
-      background: radial-gradient(circle at 35% 35%, #a0e0ff, #1a8bc0);
-      box-shadow: 0 0 16px #4fc3f7, inset 0 -2px 4px rgba(0,0,0,0.15);
-    }
+        .notification {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(40, 167, 69, 0.95);
+            color: white;
+            padding: 15px 30px;
+            border-radius: 5px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            z-index: 10000;
+            animation: slideDown 0.3s ease-out;
+        }
+        .notification.error { background: rgba(220, 53, 69, 0.95); }
+        @keyframes slideDown {
+            from { top: 50px; opacity: 0; }
+            to { top: 100px; opacity: 1; }
+        }
 
-    .lv-led.off {                            /* LED com erro/desligado (vermelho) */
-      background: #e06060;
-      background: radial-gradient(circle at 35% 35%, #ff8a8a, #b83030);
-      box-shadow: 0 0 14px #e06060, inset 0 -2px 4px rgba(0,0,0,0.2);
-    }
+        @media (max-width: 768px) {
+            .menu-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+            .menu-btn { padding: 20px 10px; font-size: 1rem; min-height: 80px; }
+            .menu-btn.main-action { grid-column: 1 / -1; }
+        }
 
-    .lv-led.wait {                           /* LED aguardando (cinza) */
-      background: #c0c8d0;
-      background: radial-gradient(circle at 35% 35%, #e0e8f0, #a0b0c0);
-      box-shadow: 0 0 8px #b0c0d0;
-    }
+        @media (min-width: 768px) {
+            .card { padding: 25px; max-width: 800px; }
+            .card-title { font-size: 1.5rem; margin-bottom: 15px; }
+            .value-display { font-size: 4rem; min-width: 200px; padding: 15px; }
+            .sub-value { font-size: 1.1rem; }
+            .vu-container { height: 200px; width: 35px; }
+            .progress-container { max-width: 500px; height: 20px; }
+            .back-btn { width: auto; }
+            header { padding: 15px 20px; }
+            .logo { font-size: 1.5rem; }
+            .logo span { font-size: 0.9rem; display: inline; margin-left: 10px; margin-top: 0; }
+            .status-bar { font-size: 1rem; }
+            .clock { font-size: 1.2rem; }
 
-    /* ================================================================
-       ESTADO CENTRAL (BADGE DE TEXTO)
-       ================================================================ */
-    .lv-estado-box {
-      background: #dce8f2;
-      background: linear-gradient(180deg, #e6f0f8, #d0dce8);
-      border-radius: 40px;
-      padding: 6px 20px;
-      margin-bottom: 24px;
-      display: inline-block;
-      border: 1px solid #b0c8dc;
-      box-shadow: inset 0 2px 5px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.6);
-      width: auto;                           /* Ajusta ao conteúdo */
-      margin-left: auto;                     /* Centraliza horizontalmente */
-      margin-right: auto;
-    }
+            .bomba-title { font-size: 1.3rem; }
+            .bomba-ppm { font-size: 3rem; min-width: 120px; padding: 10px 15px; }
+            .bomba-cont { font-size: 1.8rem; min-width: 100px; padding: 5px 12px; }
+            .bomba-ppm-label, .bomba-cont-label { font-size: 1rem; }
+            .bomba-btn { font-size: 1rem; padding: 10px 15px; max-width: 120px; }
+            .bombas-grid { gap: 20px; }
+            .bomba-card { padding: 15px 10px; }
+        }
 
-    .lv-estado {
-      font-weight: 600;
-      font-size: 0.8rem;
-      letter-spacing: 0.06em;
-      color: #1a4a6b;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 10px;                             /* Espaço entre indicador e texto */
-    }
-
-    .lv-estado .indicator {                  /* Círculo indicador */
-      display: inline-block;
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #b0c8dc;                   /* Padrão: cinza */
-      transition: 0.2s;
-      box-shadow: inset 0 1px 4px rgba(0,0,0,0.1);
-    }
-
-    .lv-estado .indicator.on {               /* Estado ligado (azul) */
-      background: #4fc3f7;
-      background: radial-gradient(circle at 35% 35%, #80d8ff, #1a8bc0);
-      box-shadow: 0 0 14px #4fc3f7;
-    }
-
-    .lv-estado .indicator.off {              /* Estado desligado (vermelho) */
-      background: #e06060;
-      background: radial-gradient(circle at 35% 35%, #ff8a8a, #b83030);
-      box-shadow: 0 0 14px #e06060;
-    }
-
-    /* ================================================================
-       BOTÃO PRINCIPAL
-       - Estilo "booleano" redondo do LabVIEW
-       ================================================================ */
-    .lv-btn-wrapper {
-      display: flex;
-      justify-content: center;               /* Centraliza o botão */
-      margin-bottom: 22px;
-    }
-
-    .lv-btn {
-      width: 120px;                          /* Largura */
-      height: 120px;                         /* Altura (quadrado perfeito) */
-      border-radius: 50%;                    /* Círculo perfeito */
-      
-      /* Estado neutro (desabilitado) */
-      background: #d0dce8;
-      background: radial-gradient(circle at 40% 35%, #eaf2f8, #b8ccdc);
-      border: 2px solid #a8bcc8;
-      
-      /* Sombra para efeito 3D */
-      box-shadow: 
-        0 6px 0 #8aa0b0,                    /* Sombra inferior para efeito de profundidade */
-        0 10px 24px rgba(0, 20, 40, 0.25),
-        inset 0 -6px 6px rgba(0,0,0,0.08),  /* Sombra interna inferior */
-        inset 0 6px 8px rgba(255,255,255,0.7); /* Brilho interno superior */
-      
-      color: #3a6a8a;                        /* Cor do ícone */
-      font-size: 2.4rem;                     /* Tamanho do ícone */
-      cursor: pointer;                       /* Cursor de mão */
-      transition: all 0.06s ease;            /* Transição rápida */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      outline: none;                         /* Remove outline do foco */
-      user-select: none;                     /* Impede seleção do texto */
-    }
-
-    .lv-btn:active {                         /* Efeito ao clicar */
-      transform: translateY(4px);            /* Desce um pouco */
-      box-shadow: 0 2px 0 #8aa0b0, 0 8px 20px rgba(0, 20, 40, 0.2);
-    }
-
-    .lv-btn:disabled {                       /* Estado desabilitado */
-      opacity: 0.4;
-      transform: translateY(4px);
-      box-shadow: 0 2px 0 #8aa0b0;
-      pointer-events: none;                  /* Impede clique */
-      filter: grayscale(0.4);                /* Tonalidade cinza */
-    }
-
-    .lv-btn.on {                             /* Estado LIGADO (azul) */
-      background: radial-gradient(circle at 40% 35%, #80d8ff, #1a8bc0);
-      border-color: #4fc3f7;
-      color: #ffffff;
-      box-shadow: 
-        0 6px 0 #0f5a7a,
-        0 0 40px #4fc3f7,                   /* Brilho externo */
-        inset 0 -6px 8px rgba(0,0,0,0.2),
-        inset 0 6px 12px rgba(255,255,255,0.4);
-    }
-
-    .lv-btn.off {                            /* Estado DESLIGADO (vermelho) */
-      background: radial-gradient(circle at 40% 35%, #ff8a8a, #b83030);
-      border-color: #e06060;
-      color: #ffffff;
-      box-shadow: 
-        0 6px 0 #7a2a2a,
-        0 0 30px #e06060,                   /* Brilho externo */
-        inset 0 -6px 8px rgba(0,0,0,0.2),
-        inset 0 6px 12px rgba(255,255,255,0.25);
-    }
-
-    .lv-btn i {
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); /* Sombra no ícone */
-    }
-
-    /* ================================================================
-       RODAPÉ (FOOTER)
-       - Informações técnicas do sistema
-       ================================================================ */
-    .lv-footer {
-      background: #dce8f2;
-      background: linear-gradient(180deg, #e6f0f8, #d0dce8);
-      border-radius: 16px;
-      padding: 14px 16px;
-      border: 1px solid #b0c8dc;
-      box-shadow: inset 0 2px 8px rgba(0,0,0,0.04), 0 1px 0 rgba(255,255,255,0.6);
-      font-size: 0.65rem;
-      display: flex;
-      flex-direction: column;                /* Empilha as linhas */
-      gap: 6px;                              /* Espaço entre linhas */
-      color: #1a4a6b;
-    }
-
-    .lv-footer .row {
-      display: flex;
-      justify-content: space-between;        /* Label à esquerda, código à direita */
-      align-items: center;
-    }
-
-    .lv-footer .row span:first-child {
-      color: #2a5f7a;
-      font-weight: 500;
-      letter-spacing: 0.02em;
-    }
-
-    .lv-footer .row code {
-      font-family: 'Inter', monospace;
-      background: #c8d8e8;
-      padding: 2px 12px;
-      border-radius: 30px;
-      color: #0a3a5a;
-      border: 1px solid #a8bcc8;
-      font-size: 0.7rem;
-      font-weight: 500;
-    }
-
-    .lv-footer .row i {
-      margin-right: 6px;
-      color: #1a6b9e;
-    }
-
-    /* ================================================================
-       RESPONSIVIDADE
-       - Ajustes para telas pequenas (celulares)
-       ================================================================ */
-    @media (max-width: 420px) {
-      .lv-panel { padding: 18px 14px; }      /* Reduz padding */
-      .lv-btn { width: 100px; height: 100px; font-size: 2rem; } /* Botão menor */
-    }
-
-    /* ================================================================
-       FIM DO CSS
-       ================================================================ */
-  </style>
+        @media (min-width: 1024px) {
+            .value-display { font-size: 5rem; }
+            .card-title { font-size: 1.8rem; }
+            .bomba-ppm { font-size: 3.5rem; }
+            .bomba-cont { font-size: 2rem; }
+        }
+    </style>
 </head>
 <body>
 
-  <!-- ================================================================
-       PAINEL PRINCIPAL
-       ================================================================ -->
-  <div class="lv-panel">
-
-    <!-- CABEÇALHO -->
-    <div class="lv-header">
-      <h2><i class="fa-regular fa-circle-play"></i> Painel de Controle</h2>
-      <div class="lv-badge"><i class="fa-regular fa-circle-check"></i> VI 2.0</div>
+<header>
+    <div class="logo">
+        WELLCON
+        <span>SISTEMA DE TRANSMISSÃO MUDLOGGING</span>
     </div>
-
-    <!-- LEDs DE STATUS (WEB e ESP32) -->
-    <div class="lv-status-grid">
-      <div class="lv-status-item">
-        <span class="label"><i class="fa-regular fa-wifi" style="margin-right: 6px;"></i>WEB → MQTT</span>
-        <div class="lv-led" id="ledPage"></div>
-        <!-- ledPage: controlado pelo JavaScript -->
-      </div>
-      <div class="lv-status-item">
-        <span class="label"><i class="fa-regular fa-microchip" style="margin-right: 6px;"></i>ESP32 → MQTT</span>
-        <div class="lv-led" id="ledEsp"></div>
-        <!-- ledEsp: controlado pelo JavaScript -->
-      </div>
-    </div>
-
-    <!-- ESTADO CENTRAL -->
-    <div style="display: flex; justify-content: center;">
-      <div class="lv-estado-box">
-        <div class="lv-estado">
-          <span class="indicator" id="estadoIndicator"></span>
-          <!-- estadoIndicator: círculo colorido -->
-          <span id="txtEstado">AGUARDANDO</span>
-          <!-- txtEstado: texto LIGADO/DESLIGADO -->
+    <div class="status-bar">
+        <div>
+            <span id="status-dot" class="status-indicator"></span>
+            <span id="status-text">Desconectado</span>
         </div>
-      </div>
+        <div id="clock" class="clock">00:00:00</div>
+    </div>
+</header>
+
+<main>
+    <!-- MENU PRINCIPAL -->
+    <div id="view-menu" class="view active">
+        <div class="menu-grid">
+            <button class="menu-btn" onclick="showView('view-bombas')">🚀 BOMBAS</button>
+            <button class="menu-btn" onclick="showView('view-rpm-mesa')">🔄 RPM MESA</button>
+            <button class="menu-btn" onclick="showView('view-rpm-desgas')">🔄 RPM DESGAS</button>
+            <button class="menu-btn" onclick="showView('view-profundidade')">📏 PROFUND</button>
+
+            <button class="menu-btn" onclick="showView('view-gas')">💨 GÁS</button>
+            <button class="menu-btn main-action" onclick="showView('view-gas-fisico')">🔥 GÁS FÍSICO</button>
+            <button class="menu-btn" onclick="showView('view-pressao')">📊 PRESSÃO</button>
+
+            <button class="menu-btn" onclick="showView('view-torque')">🔧 TORQUE</button>
+            <button class="menu-btn" onclick="showView('view-temp')">🌡️ TEMP</button>
+        </div>
     </div>
 
-    <!-- BOTÃO PRINCIPAL -->
-    <div class="lv-btn-wrapper">
-      <button id="btnRele" class="lv-btn off" disabled>
-        <i class="fa-solid fa-power-off"></i>
-      </button>
-      <!-- btnRele: controlado pelo JavaScript -->
+    <!-- TELA BOMBAS -->
+    <div id="view-bombas" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FF6B35">🚀 BOMBAS 1 e 2 - PPM</div>
+            <div class="bombas-grid">
+                <div class="bomba-card">
+                    <div class="bomba-title" style="color: #FF6B35">🚀 BOMBA 1</div>
+                    <div class="bomba-ppm-label">PPM</div>
+                    <div id="val-ppm1" class="bomba-ppm">0</div>
+                    <div class="bomba-cont-label">CONTAGEM</div>
+                    <div id="val-cont1" class="bomba-cont">0</div>
+                    <button class="bomba-btn" onclick="zerarBomba1(this)">ZERAR</button>
+                </div>
+                <div class="bomba-card">
+                    <div class="bomba-title" style="color: #00B4D8">💧 BOMBA 2</div>
+                    <div class="bomba-ppm-label">PPM</div>
+                    <div id="val-ppm2" class="bomba-ppm">0</div>
+                    <div class="bomba-cont-label">CONTAGEM</div>
+                    <div id="val-cont2" class="bomba-cont">0</div>
+                    <button class="bomba-btn" onclick="zerarBomba2(this)">ZERAR</button>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
     </div>
 
-    <!-- RODAPÉ COM INFORMAÇÕES -->
-    <div class="lv-footer">
-      <div class="row">
-        <span><i class="fa-regular fa-server"></i> Broker</span>
-        <code>broker.emqx.io</code>
-      </div>
-      <div class="row">
-        <span><i class="fa-regular fa-paper-plane"></i> Cmd</span>
-        <code>casa/rele/cmd</code>
-      </div>
-      <div class="row">
-        <span><i class="fa-regular fa-rotate-right"></i> Status</span>
-        <code>casa/rele/status</code>
-      </div>
-      <div class="row" style="margin-top: 4px; border-top: 1px solid #b0c8dc; padding-top: 8px;">
-        <span><i class="fa-regular fa-clock"></i> client</span>
-        <code style="font-size: 0.6rem;" id="clientIdDisplay">web_rele_xxx</code>
-      </div>
+    <!-- TELA RPM MESA -->
+    <div id="view-rpm-mesa" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #00B4D8">🔄 RPM DA MESA ROTATIVA</div>
+            <div class="sub-value">RPM</div>
+            <div id="val-rpm-mesa" class="value-display" style="color: #00FF00">0</div>
+            <div class="sub-value">Contagem de Pulsos: <span id="val-cont-rpm-mesa" style="color: white; font-size: 1.2rem;">0</span></div>
+            <button class="action-btn" onclick="zerarRPM_Mesa(this)">ZERAR</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
     </div>
-  </div>
 
-  <!-- ================================================================
-       JAVASCRIPT - LÓGICA DE CONEXÃO MQTT E CONTROLE
-       ================================================================ -->
-  <script>
-    (function() {
-      // ============================================================
-      // CONFIGURAÇÕES MQTT
-      // ============================================================
-      const BROKER       = "wss://broker.emqx.io:8084/mqtt";  // Endereço do broker
-      const TOPIC_STATUS = "casa/rele/status";               // Tópico de status
-      const TOPIC_CMD    = "casa/rele/cmd";                  // Tópico de comando
-      const CLIENT_ID    = "web_rele_" + Math.random().toString(16).substr(2, 6); // ID único
+    <!-- TELA RPM DESGASEIFICADOR -->
+    <div id="view-rpm-desgas" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #9B59B6">🔄 RPM DO DESGASEIFICADOR</div>
+            <div class="sub-value">RPM</div>
+            <div id="val-rpm-desgas" class="value-display" style="color: #9B59B6">0</div>
+            <div class="sub-value">Contagem de Pulsos: <span id="val-cont-rpm-desgas" style="color: white; font-size: 1.2rem;">0</span></div>
+            <button class="action-btn" onclick="zerarRPM_Desgas(this)">ZERAR</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
 
-      // ============================================================
-      // VARIÁVEIS DE ESTADO
-      // ============================================================
-      let client = null;           // Cliente MQTT
-      let estado = false;          // Estado atual do relé (false = desligado)
-      let ultimaMsg = 0;           // Timestamp da última mensagem recebida
-      const TIMEOUT = 8000;        // 8 segundos sem mensagem = ESP32 desconectado
+    <!-- TELA PROFUNDIDADE -->
+    <div id="view-profundidade" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FFD700">📏 PROFUNDIDADE</div>
+            <div class="sub-value">MODO ATUAL: <span id="val-modo" style="color: #FF6B35">CONTAGEM</span></div>
+            <div id="val-prof" class="value-display" style="color: #FFD700">0 m</div>
+            <div style="margin: 10px 0; color: white; font-size: 0.8rem; line-height: 1.4;">
+                Para usar a profundidade, pressione os dois botões juntos por 4 segundos<br>
+                <span style="color: #888; font-size: 0.7rem;">SENSOR 2 + SENSOR 1 = INCREMENTAR | SENSOR 1 + SENSOR 2 = DECREMENTAR</span>
+            </div>
+            <button class="action-btn" onclick="zerarProfundidade(this)">ZERAR</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
 
-      // ============================================================
-      // REFERÊNCIAS DOS ELEMENTOS HTML
-      // ============================================================
-      const ledPage   = document.getElementById("ledPage");
-      const ledEsp    = document.getElementById("ledEsp");
-      const btnRele   = document.getElementById("btnRele");
-      const txtEstado = document.getElementById("txtEstado");
-      const estadoIndicator = document.getElementById("estadoIndicator");
-      const clientIdDisplay = document.getElementById("clientIdDisplay");
+    <!-- TELA GÁS -->
+    <div id="view-gas" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FF6B35">💨 DETECTOR DE GÁS</div>
+            <div class="config-row">
+                <label for="gas-max">Máx:</label>
+                <input type="number" id="gas-max" value="100" onchange="atualizarGasMax()">
+                <label for="gas-unit">Unidade:</label>
+                <input type="text" id="gas-unit" value="UGT" onchange="atualizarGasUnit()">
+            </div>
+            <div id="val-gas" class="value-display" style="color: #00FF00">0 UGT</div>
+            <div class="progress-container">
+                <div id="progress-gas" class="progress-bar"></div>
+            </div>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
 
-      // Exibe o ID do cliente no rodapé
-      clientIdDisplay.textContent = CLIENT_ID;
+    <!-- TELA PRESSÃO -->
+    <div id="view-pressao" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #00B4D8">📊 SENSOR DE PRESSÃO</div>
+            <div id="val-press" class="value-display" style="color: #00FF00">0.0 PSI</div>
+            <div class="progress-container">
+                <div id="progress-press" class="progress-bar" style="background: #00B4D8;"></div>
+            </div>
+            <button class="action-btn" onclick="taraPressao(this)">TARA</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
 
-      // ============================================================
-      // FUNÇÃO: ATUALIZA A INTERFACE
-      // - Muda cores do botão, texto e indicador
-      // ============================================================
-      function atualizarUI() {
-        if (estado) {
-          // Estado LIGADO
-          btnRele.classList.remove("off");
-          btnRele.classList.add("on");
-          txtEstado.textContent = "LIGADO";
-          estadoIndicator.className = "indicator on";
+    <!-- TELA TORQUE -->
+    <div id="view-torque" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #4ECDC4">🔧 SENSOR DE TORQUE</div>
+            <div id="val-torque" class="value-display" style="color: #4ECDC4">0.0 Nm</div>
+            <div class="progress-container">
+                <div id="progress-torque" class="progress-bar" style="background: #4ECDC4;"></div>
+            </div>
+            <button class="action-btn" onclick="taraTorque(this)">TARA</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA TEMPERATURA -->
+    <div id="view-temp" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #FF6B6B">🌡️ SENSOR DE TEMPERATURA</div>
+            <div id="val-temp" class="value-display" style="color: #FF6B6B">0.0 °C</div>
+            <div class="progress-container">
+                <div id="progress-temp" class="progress-bar" style="background: #FF6B6B;"></div>
+            </div>
+            <button class="action-btn" onclick="taraTemp(this)">TARA</button>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+
+    <!-- TELA GÁS FÍSICO -->
+    <div id="view-gas-fisico" class="view">
+        <div class="card">
+            <div class="card-title" style="color: #E74C3C">🔥 GÁS FÍSICO</div>
+            <div class="dual-grid">
+                <div>
+                    <div class="sub-value">UGT</div>
+                    <div id="val-ugt" class="value-display" style="color: #00FF00; font-size: 2.5rem;">0</div>
+                    <div class="vu-container">
+                        <div class="vu-label">VU</div>
+                        <div id="vu-ugt" class="vu-bar"></div>
+                        <div id="vu-ugt-text" class="vu-text">0%</div>
+                    </div>
+                </div>
+                <div>
+                    <div class="sub-value">TC</div>
+                    <div id="val-tc" class="value-display" style="color: #00FF00; font-size: 2.5rem;">0</div>
+                    <div class="vu-container">
+                        <div class="vu-label">VU</div>
+                        <div id="vu-tc" class="vu-bar"></div>
+                        <div id="vu-tc-text" class="vu-text">0%</div>
+                    </div>
+                </div>
+            </div>
+            <button class="back-btn" onclick="showView('view-menu')">← VOLTAR AO MENU</button>
+        </div>
+    </div>
+</main>
+
+<script>
+    /* ---------- CONFIGURAÇÃO MQTT ---------- */
+    const MQTT_BROKER = "broker.emqx.io";
+    const USE_SSL = (location.protocol === "https:");
+    const MQTT_PORT = USE_SSL ? 8084 : 8083;   // 8083 = ws, 8084 = wss
+    const DEVICE_ID = "esp32_wellguard_station01";
+    const TOPIC_DADOS = `wellguard/${DEVICE_ID}/dados`;
+    const TOPIC_COMANDOS = `wellguard/${DEVICE_ID}/comandos`;
+    const clientID = "web_client_" + Math.random().toString(16).substr(2, 8);
+    const client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, "/mqtt", clientID);
+
+    /* ---------- ESTADO ---------- */
+    // Offsets de tara (nomes DIFERENTES das funções taraXxx)
+    let offsetPressao = 0, offsetTorque = 0, offsetTemp = 0;
+    let brutoPressao = 0, brutoTorque = 0, brutoTemp = 0;
+    let gasMax = 100;
+    let gasUnit = "UGT";
+    let ultimoSensorAna = 0;
+    let conectando = false;
+
+    function $(id) { return document.getElementById(id); }
+
+    /* ---------- GÁS ---------- */
+    function atualizarGasMax() {
+        const input = $('gas-max');
+        const valor = parseFloat(input.value);
+        if (!isNaN(valor) && valor > 0) { gasMax = valor; renderSensores(); }
+        else { input.value = gasMax; }
+    }
+
+    function atualizarGasUnit() {
+        const input = $('gas-unit');
+        const valor = input.value.trim();
+        if (valor.length > 0) { gasUnit = valor; renderSensores(); }
+        else { input.value = gasUnit; }
+    }
+
+    /* ---------- RENDER DOS SENSORES ANALÓGICOS ---------- */
+    function renderSensores() {
+        const v = ultimoSensorAna;
+
+        // Gás
+        const gas = Math.floor((v / 1023.0) * gasMax);
+        $('val-gas').innerText = gas + " " + gasUnit;
+        $('progress-gas').style.width = Math.min((gas / gasMax) * 100, 100) + "%";
+
+        // Pressão (4-20mA, 0-1000 PSI)
+        const tensao = (v / 1023.0) * 5.0;
+        let corrente = 4.0 + (tensao - 1.0) * (16.0 / 4.0);
+        corrente = Math.max(4.0, Math.min(20.0, corrente));
+        brutoPressao = ((corrente - 4.0) / 16.0) * 1000;
+        const pressao = Math.max(0, brutoPressao - offsetPressao);
+        $('val-press').innerText = pressao.toFixed(1) + " PSI";
+        $('progress-press').style.width = Math.min((pressao / 1000) * 100, 100) + "%";
+
+        // Torque (0-500 Nm)
+        brutoTorque = (v / 1023.0) * 500;
+        const torque = Math.max(0, brutoTorque - offsetTorque);
+        $('val-torque').innerText = torque.toFixed(1) + " Nm";
+        $('progress-torque').style.width = Math.min((torque / 500) * 100, 100) + "%";
+
+        // Temperatura (0-150 °C)
+        brutoTemp = (v / 1023.0) * 150;
+        const temp = Math.max(0, brutoTemp - offsetTemp);
+        $('val-temp').innerText = temp.toFixed(1) + " °C";
+        $('progress-temp').style.width = Math.min((temp / 150) * 100, 100) + "%";
+    }
+
+    /* ---------- NOTIFICAÇÃO ---------- */
+    function mostrarNotificacao(texto, isError = false) {
+        const anterior = document.querySelector('.notification');
+        if (anterior) anterior.remove();
+
+        const notif = document.createElement('div');
+        notif.className = 'notification' + (isError ? ' error' : '');
+        notif.innerText = texto;
+        document.body.appendChild(notif);
+
+        setTimeout(() => { if (notif.parentNode) notif.remove(); }, 2000);
+    }
+
+    /* ---------- MQTT ---------- */
+    client.onConnectionLost = function (resp) {
+        updateStatus(false);
+        console.error("❌ Conexão MQTT perdida:", resp.errorMessage);
+        conectando = false;
+        setTimeout(connectMQTT, 3000);
+    };
+
+    client.onMessageArrived = function (message) {
+        try {
+            atualizarInterface(JSON.parse(message.payloadString));
+        } catch (e) {
+            console.error("Erro ao processar mensagem:", e);
+        }
+    };
+
+    function connectMQTT() {
+        if (conectando || client.isConnected()) return;
+        conectando = true;
+        console.log("🔌 Conectando ao MQTT...");
+        try {
+            client.connect({
+                onSuccess: function () {
+                    conectando = false;
+                    updateStatus(true);
+                    client.subscribe(TOPIC_DADOS);
+                    console.log("✅ Conectado e inscrito em:", TOPIC_DADOS);
+                },
+                onFailure: function (e) {
+                    conectando = false;
+                    updateStatus(false);
+                    console.error("❌ Falha na conexão:", e.errorMessage);
+                    setTimeout(connectMQTT, 3000);
+                },
+                useSSL: USE_SSL,
+                keepAliveInterval: 30,
+                timeout: 10
+            });
+        } catch (e) {
+            conectando = false;
+            console.error("Erro no connect:", e);
+            setTimeout(connectMQTT, 3000);
+        }
+    }
+
+    function updateStatus(connected) {
+        const dot = $('status-dot');
+        const text = $('status-text');
+        if (connected) {
+            dot.classList.add('connected');
+            text.innerText = "Conectado (MQTT)";
         } else {
-          // Estado DESLIGADO
-          btnRele.classList.remove("on");
-          btnRele.classList.add("off");
-          txtEstado.textContent = "DESLIGADO";
-          estadoIndicator.className = "indicator off";
+            dot.classList.remove('connected');
+            text.innerText = "Desconectado";
         }
-      }
+    }
 
-      // ============================================================
-      // FUNÇÃO: CONECTA AO BROKER MQTT
-      // ============================================================
-      function conectar() {
-        client = mqtt.connect(BROKER, {
-          clientId: CLIENT_ID,
-          clean: true,               // Sessão limpa
-          reconnectPeriod: 3000      // Tenta reconectar a cada 3 segundos
-        });
+    /* ---------- NAVEGAÇÃO ---------- */
+    function showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        const alvo = $(viewId);
+        if (alvo) alvo.classList.add('active');
+        else console.error("View não encontrada:", viewId);
+        window.scrollTo(0, 0);
+    }
 
-        // Evento: CONECTADO
-        client.on("connect", () => {
-          ledPage.className = "lv-led on";        // LED Web = verde/azul
-          client.subscribe(TOPIC_STATUS);         // Inscreve no tópico de status
-          btnRele.disabled = false;               // Habilita o botão
-        });
-
-        // Evento: TENTANDO RECONECTAR
-        client.on("reconnect", () => {
-          ledPage.className = "lv-led wait";      // LED Web = amarelo/cinza
-          btnRele.disabled = true;                // Desabilita o botão
-        });
-
-        // Evento: CONEXÃO FECHADA
-        client.on("close", () => {
-          ledPage.className = "lv-led off";       // LED Web = vermelho
-          btnRele.disabled = true;                // Desabilita o botão
-        });
-
-        // Evento: ERRO
-        client.on("error", (err) => {
-          console.warn("MQTT error:", err);
-          ledPage.className = "lv-led off";
-        });
-
-        // Evento: MENSAGEM RECEBIDA
-        client.on("message", (topic, message) => {
-          if (topic === TOPIC_STATUS) {
-            ultimaMsg = Date.now();               // Atualiza timestamp
-            ledEsp.className = "lv-led on";       // LED ESP32 = verde/azul
-
-            // Converte a mensagem para texto e define o estado
-            const payload = message.toString().toLowerCase().trim();
-            estado = (payload === "on" || payload === "1" || payload === "true");
-            atualizarUI();                        // Atualiza a interface
-          }
-        });
-      }
-
-      // ============================================================
-      // TIMER: VERIFICA SE O ESP32 ESTÁ RESPONDENDO
-      // - Se passar do TIMEOUT, LED ESP32 fica vermelho
-      // ============================================================
-      setInterval(() => {
-        if (Date.now() - ultimaMsg > TIMEOUT) {
-          ledEsp.className = "lv-led off";       // LED ESP32 = vermelho
+    /* ---------- COMANDOS ---------- */
+    function sendCommand(cmd, buttonElement) {
+        if (!client.isConnected()) {
+            mostrarNotificacao("❌ Sem conexão MQTT!", true);
+            return false;
         }
-      }, 1200); // Verifica a cada 1.2 segundos
+        try {
+            const message = new Paho.MQTT.Message(cmd);
+            message.destinationName = TOPIC_COMANDOS;
+            message.qos = 1;
+            client.send(message);
 
-      // ============================================================
-      // EVENTO: CLIQUE NO BOTÃO
-      // - Publica "toggle" no tópico de comando
-      // ============================================================
-      btnRele.addEventListener("click", () => {
-        if (!client || !client.connected) return; // Se desconectado, não faz nada
-        client.publish(TOPIC_CMD, "toggle");      // Envia comando toggle
-      });
-
-      // ============================================================
-      // INICIALIZAÇÃO
-      // ============================================================
-      conectar();                                  // Conecta ao broker
-      estado = false;                              // Estado inicial: desligado
-      atualizarUI();                               // Atualiza interface
-
-      // LED Web começa como "wait" até conectar
-      ledPage.className = "lv-led wait";
-      
-      // Se conectar dentro de 2 segundos, muda para "on"
-      setTimeout(() => {
-        if (ledPage.className === "lv-led wait" && client && client.connected) {
-          ledPage.className = "lv-led on";
+            if (buttonElement) {
+                const originalText = buttonElement.innerText;
+                buttonElement.classList.add('sent');
+                buttonElement.innerText = '✓';
+                setTimeout(() => {
+                    buttonElement.classList.remove('sent');
+                    buttonElement.innerText = originalText;
+                }, 1000);
+            }
+            return true;
+        } catch (e) {
+            console.error("Erro ao enviar comando:", e);
+            mostrarNotificacao("❌ Erro ao enviar comando", true);
+            return false;
         }
-      }, 2000);
+    }
 
-    })(); // Fim da função auto-executável
-  </script>
+    function zerarBomba1(btn) {
+        $('val-ppm1').innerText = '0';
+        $('val-cont1').innerText = '0';
+        if (sendCommand('ZERAR_B1', btn)) mostrarNotificacao('✅ Bomba 1 zerada!');
+    }
 
+    function zerarBomba2(btn) {
+        $('val-ppm2').innerText = '0';
+        $('val-cont2').innerText = '0';
+        if (sendCommand('ZERAR_B2', btn)) mostrarNotificacao('✅ Bomba 2 zerada!');
+    }
+
+    function zerarRPM_Mesa(btn) {
+        $('val-rpm-mesa').innerText = '0';
+        $('val-cont-rpm-mesa').innerText = '0';
+        if (sendCommand('ZERAR_RPM_MESA', btn)) mostrarNotificacao('✅ RPM Mesa zerada!');
+    }
+
+    function zerarRPM_Desgas(btn) {
+        $('val-rpm-desgas').innerText = '0';
+        $('val-cont-rpm-desgas').innerText = '0';
+        if (sendCommand('ZERAR_RPM_DESGAS', btn)) mostrarNotificacao('✅ RPM Desgasificador zerado!');
+    }
+
+    function zerarProfundidade(btn) {
+        $('val-prof').innerText = '0 m';
+        if (sendCommand('ZERAR_PROF', btn)) mostrarNotificacao('✅ Profundidade zerada!');
+    }
+
+    function taraPressao(btn) {
+        offsetPressao = brutoPressao;
+        renderSensores();
+        if (sendCommand('TARA_PRESS', btn)) mostrarNotificacao('✅ Tara de pressão aplicada!');
+    }
+
+    function taraTorque(btn) {
+        offsetTorque = brutoTorque;
+        renderSensores();
+        if (sendCommand('TARA_TORQUE', btn)) mostrarNotificacao('✅ Tara de torque aplicada!');
+    }
+
+    function taraTemp(btn) {
+        offsetTemp = brutoTemp;
+        renderSensores();
+        if (sendCommand('TARA_TEMP', btn)) mostrarNotificacao('✅ Tara de temperatura aplicada!');
+    }
+
+    /* ---------- DADOS ---------- */
+    function mapValue(x, in_min, in_max, out_min, out_max) {
+        return Math.floor((x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min);
+    }
+
+    function atualizarVU(barId, textId, valor, maxValor) {
+        const percent = Math.max(0, Math.min((valor / maxValor) * 100, 100));
+        const bar = $(barId);
+        bar.style.height = percent + "%";
+        bar.style.background = percent < 60 ? '#00FF00' : (percent < 80 ? '#FFFF00' : '#FF0000');
+        $(textId).innerText = Math.floor(percent) + "%";
+    }
+
+    function atualizarInterface(data) {
+        if (data.contagem1 !== undefined) $('val-cont1').innerText = data.contagem1;
+        if (data.PPM1 !== undefined) $('val-ppm1').innerText = data.PPM1;
+        if (data.contagem2 !== undefined) $('val-cont2').innerText = data.contagem2;
+        if (data.PPM2 !== undefined) $('val-ppm2').innerText = data.PPM2;
+
+        if (data.PPM1 !== undefined) {
+            $('val-rpm-mesa').innerText = data.PPM1;
+            $('val-cont-rpm-mesa').innerText = data.contagem1 || 0;
+        }
+        if (data.PPM2 !== undefined) {
+            $('val-rpm-desgas').innerText = data.PPM2;
+            $('val-cont-rpm-desgas').innerText = data.contagem2 || 0;
+        }
+
+        if (data.Profundidade !== undefined) {
+            $('val-prof').innerText = data.Profundidade + " m";
+        }
+
+        if (data.sensorAna !== undefined) {
+            ultimoSensorAna = parseFloat(data.sensorAna) || 0;
+            renderSensores();
+        }
+
+        if (data.UGT1 !== undefined) {
+            const ugt = mapValue(parseInt(data.UGT1), 0, 1023, 0, 400);
+            $('val-ugt').innerText = ugt;
+            atualizarVU('vu-ugt', 'vu-ugt-text', ugt, 400);
+        }
+        if (data.TC1 !== undefined) {
+            const tc = mapValue(parseInt(data.TC1), 0, 1023, 0, 4000);
+            $('val-tc').innerText = tc;
+            atualizarVU('vu-tc', 'vu-tc-text', tc, 4000);
+        }
+    }
+
+    function updateClock() {
+        $('clock').innerText = new Date().toLocaleTimeString('pt-BR');
+    }
+
+    setInterval(updateClock, 1000);
+    updateClock();
+    connectMQTT();
+</script>
 </body>
 </html>
