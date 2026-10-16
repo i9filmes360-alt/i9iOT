@@ -615,12 +615,29 @@
     };
 
     client.onMessageArrived = function (message) {
-        try {
-            atualizarInterface(JSON.parse(message.payloadString));
-        } catch (e) {
-            console.error("Erro ao processar mensagem:", e);
-        }
+        const topico = message.destinationName;
+        const raw = message.payloadString;
+        if (topico === TOPIC_COMANDOS) return;   // ignora eco dos próprios comandos
+        const data = parseTolerante(raw);
+        if (data) atualizarInterface(data);
+        else console.error("Mensagem ilegível:", raw);
     };
+
+    // Lê JSON válido; se falhar (ex.: {"senso1", "PPM1":236}), extrai os pares "chave":valor
+    function parseTolerante(raw) {
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            const data = {};
+            const re = /"([^"]+)"\s*:\s*(-?\d+(?:\.\d+)?|"[^"]*"|true|false|null)/g;
+            let m, achou = false;
+            while ((m = re.exec(raw)) !== null) {
+                try { data[m[1]] = JSON.parse(m[2]); achou = true; } catch (_) {}
+            }
+            return achou ? data : null;
+        }
+    }
+
 
     function connectMQTT() {
         if (conectando || client.isConnected()) return;
@@ -631,7 +648,7 @@
                 onSuccess: function () {
                     conectando = false;
                     updateStatus(true);
-                    client.subscribe(TOPIC_DADOS);
+                    client.subscribe(`wellguard/${DEVICE_ID}/#`);
                     console.log("✅ Conectado e inscrito em:", TOPIC_DADOS);
                 },
                 onFailure: function (e) {
@@ -761,37 +778,61 @@
         $(textId).innerText = Math.floor(percent) + "%";
     }
 
+    function pick(data, nomes) {
+        const norm = t => t.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const mapa = {};
+        for (const k in data) mapa[norm(k)] = data[k];
+        for (const n of nomes) {
+            const v = mapa[norm(n)];
+            if (v !== undefined && v !== null) return v;
+        }
+        return undefined;
+    }
+
     function atualizarInterface(data) {
-        if (data.contagem1 !== undefined) $('val-cont1').innerText = data.contagem1;
-        if (data.PPM1 !== undefined) $('val-ppm1').innerText = data.PPM1;
-        if (data.contagem2 !== undefined) $('val-cont2').innerText = data.contagem2;
-        if (data.PPM2 !== undefined) $('val-ppm2').innerText = data.PPM2;
+        const cont1 = pick(data, ['contagem1', 'cont1', 'count1', 'pulsos1']);
+        const ppm1  = pick(data, ['PPM1', 'spm1', 'bomba1']);
+        const cont2 = pick(data, ['contagem2', 'cont2', 'count2', 'pulsos2']);
+        const ppm2  = pick(data, ['PPM2', 'spm2', 'bomba2']);
+        const rpmMesa  = pick(data, ['rpmMesa', 'rpm_mesa', 'RPM1']);
+        const contMesa = pick(data, ['contRpmMesa', 'cont_rpm_mesa', 'contagemRPM1']);
+        const rpmDes   = pick(data, ['rpmDesgas', 'rpm_desgas', 'RPM2']);
+        const contDes  = pick(data, ['contRpmDesgas', 'cont_rpm_desgas', 'contagemRPM2']);
+        const prof     = pick(data, ['Profundidade', 'prof', 'depth']);
 
-        if (data.PPM1 !== undefined) {
-            $('val-rpm-mesa').innerText = data.PPM1;
-            $('val-cont-rpm-mesa').innerText = data.contagem1 || 0;
+        if (cont1 !== undefined) $('val-cont1').innerText = cont1;
+        if (ppm1  !== undefined) $('val-ppm1').innerText = ppm1;
+        if (cont2 !== undefined) $('val-cont2').innerText = cont2;
+        if (ppm2  !== undefined) $('val-ppm2').innerText = ppm2;
+
+        const rm = rpmMesa !== undefined ? rpmMesa : ppm1;
+        if (rm !== undefined) {
+            $('val-rpm-mesa').innerText = rm;
+            $('val-cont-rpm-mesa').innerText = (contMesa !== undefined ? contMesa : cont1) || 0;
         }
-        if (data.PPM2 !== undefined) {
-            $('val-rpm-desgas').innerText = data.PPM2;
-            $('val-cont-rpm-desgas').innerText = data.contagem2 || 0;
+        const rd = rpmDes !== undefined ? rpmDes : ppm2;
+        if (rd !== undefined) {
+            $('val-rpm-desgas').innerText = rd;
+            $('val-cont-rpm-desgas').innerText = (contDes !== undefined ? contDes : cont2) || 0;
         }
 
-        if (data.Profundidade !== undefined) {
-            $('val-prof').innerText = data.Profundidade + " m";
-        }
+        if (prof !== undefined) $('val-prof').innerText = prof + " m";
 
-        if (data.sensorAna !== undefined) {
-            ultimoSensorAna = parseFloat(data.sensorAna) || 0;
+        const ana = pick(data, ['sensorAna', 'analog', 'sensor_ana']);
+        if (ana !== undefined) {
+            ultimoSensorAna = parseFloat(ana) || 0;
             renderSensores();
         }
 
-        if (data.UGT1 !== undefined) {
-            const ugt = mapValue(parseInt(data.UGT1), 0, 1023, 0, 400);
+        const ugtRaw = pick(data, ['UGT1', 'UGT']);
+        if (ugtRaw !== undefined) {
+            const ugt = mapValue(parseInt(ugtRaw), 0, 1023, 0, 400);
             $('val-ugt').innerText = ugt;
             atualizarVU('vu-ugt', 'vu-ugt-text', ugt, 400);
         }
-        if (data.TC1 !== undefined) {
-            const tc = mapValue(parseInt(data.TC1), 0, 1023, 0, 4000);
+        const tcRaw = pick(data, ['TC1', 'TC']);
+        if (tcRaw !== undefined) {
+            const tc = mapValue(parseInt(tcRaw), 0, 1023, 0, 4000);
             $('val-tc').innerText = tc;
             atualizarVU('vu-tc', 'vu-tc-text', tc, 4000);
         }
